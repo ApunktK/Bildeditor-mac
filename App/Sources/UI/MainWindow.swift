@@ -311,6 +311,10 @@ final class ToolOptionsBar: NSView {
         let stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
         stack.orientation = .horizontal
         stack.spacing = 10
+        // Schmale Fenster: zuerst den Hinweistext, dann die Zauberstab-Optionen ausblenden statt das Fenster zu verbreitern.
+        stack.setClippingResistancePriority(.defaultLow, for: .horizontal)
+        stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 300), for: optionsLabel)
+        stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 600), for: wandGroup)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([

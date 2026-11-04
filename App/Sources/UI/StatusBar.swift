@@ -73,6 +73,11 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
         let right = NSStackView(views: [sizeIcon, sizeLabel, posIcon, posLabel, selIcon, selLabel, unitPopup, zoomField, quickSize, zoomOutButton, zoomSlider, zoomInButton])
         right.orientation = .horizontal
         right.spacing = 6
+        // Schmale Fenster: weniger wichtige Angaben werden ausgeblendet statt das Fenster zu verbreitern.
+        right.setClippingResistancePriority(.defaultLow, for: .horizontal)
+        for (v, p) in [(selIcon, 400), (selLabel, 400), (posIcon, 500), (posLabel, 500), (zoomSlider, 600), (unitPopup, 700)] as [(NSView, Float)] {
+            right.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: p), for: v)
+        }
         right.setCustomSpacing(16, after: sizeLabel)
         right.setCustomSpacing(16, after: posLabel)
         right.setCustomSpacing(16, after: selLabel)

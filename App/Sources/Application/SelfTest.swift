@@ -430,6 +430,15 @@ final class SelfTest {
         let histVC = ctrl.panels.controllers[.history] as? HistoryPanelController
         histVC?.reload()
         snapshot(ctrl.panels.panels[.history]?.contentView, "08-verlauf-auswahl")
+        if let w = main.window {
+            check("Fensterbreite bleibt 1280 (Auswahlwerkzeug)", abs(w.frame.width - 1280) < 1, "\(w.frame.width)")
+            ctrl.tool = .magicWand
+            w.setFrame(NSRect(x: 40, y: 40, width: 1000, height: 700), display: true)
+            pump(0.3)
+            check("Schmales Fenster mit Zauberstab-Optionen (1000 pt)", abs(w.frame.width - 1000) < 1, "\(w.frame.width)")
+            snapshot(w.contentView, "10-schmal-zauberstab")
+            w.setFrame(NSRect(x: 40, y: 40, width: 1280, height: 820), display: true)
+        }
         ctrl.tool = .zoom
     }
 
