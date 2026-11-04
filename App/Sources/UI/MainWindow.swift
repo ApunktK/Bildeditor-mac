@@ -241,7 +241,7 @@ final class ToolOptionsBar: NSView {
     let toolPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let optionsLabel = NSTextField(labelWithString: "")
     // Auswahlwerkzeuge
-    let modeControl = NSSegmentedControl(labels: SelectionMode.allCases.map { Self.shortName($0) }, trackingMode: .selectOne, target: nil, action: nil)
+    let modeControl = NSSegmentedControl(labels: SelectionMode.allCases.map { ToolOptionsBar.shortName($0) }, trackingMode: .selectOne, target: nil, action: nil)
     let floodPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let samplePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let toleranceSlider = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)

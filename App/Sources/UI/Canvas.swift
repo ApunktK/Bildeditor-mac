@@ -394,7 +394,9 @@ final class CanvasController: NSObject {
     }()
 
     func toolChanged() {
-        selection.cancelDrag() canvasView.window?.invalidateCursorRects(for: canvasView) }
+        selection.cancelDrag()
+        canvasView.window?.invalidateCursorRects(for: canvasView)
+    }
 
     func pointerMoved(_ e: NSEvent) {
         guard session != nil else { onPointerMoved?(nil); return }
