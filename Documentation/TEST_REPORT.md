@@ -1,6 +1,6 @@
 # TEST_REPORT.md
 
-Stand: 04.11.2026 · Version 0.2.0 (Build 2) · Branch `phase-2`
+Stand: 04.11.2026 · Version 0.3.0 (Build 3) · Branch `phase-2`
 
 ## 1. Testumgebung
 
@@ -15,9 +15,9 @@ Stand: 04.11.2026 · Version 0.2.0 (Build 2) · Branch `phase-2`
 
 | Testsuite | Anzahl | Ergebnis |
 |---|---|---|
-| EditorKit (Kern: Kacheln, Farben, Einheiten, Zoom, Mischmodi, Dokument, Verlauf, Ebenen) | 33 | 33 bestanden (Linux und macOS) |
-| App-Tests (PNG-Hin-/Rückweg mit Halbtransparenz, JPEG auf Weiß, HSV, Palette, Zoomeingabe/-regler, Befehlstabelle ↔ Menüs, Tastenkürzel-Anzeige, Werkzeugtasten) | 8 | 8 bestanden |
-| Selbsttest der Release-App | 72 | 72 bestanden, Dauer ca. 7 s |
+| EditorKit (Kern: Kacheln, Farben, Einheiten, Zoom, Mischmodi, Dokument, Verlauf, Ebenen, **Auswahlmaske, Auswahl-Operationen, schwebende Pixel**) | 53 | 53 bestanden (Linux und macOS) |
+| App-Tests (PNG-Hin-/Rückweg mit Halbtransparenz, JPEG auf Weiß, HSV, Palette, Zoomeingabe/-regler, Befehlstabelle ↔ Menüs, Tastenkürzel-Anzeige, Werkzeugtasten, Auswahlmodus aus Zusatztasten, Rechteck-Einrasten, Kontur) | 11 | 11 bestanden |
+| Selbsttest der Release-App | SELFTESTN | SELFTESTN bestanden |
 | Universal-Binary | `lipo -info` | „x86_64 arm64“ |
 | DMG | `hdiutil verify` | gültig |
 
@@ -38,14 +38,18 @@ Stand: 04.11.2026 · Version 0.2.0 (Build 2) · Branch `phase-2`
 | Werkzeuge/Farben | Hand, Taste Z, nicht umgesetztes Werkzeug nicht wählbar, Farben tauschen, HSV-Umrechnung |
 | Fenster | alle vier sichtbar, ausblenden, Positionen zurücksetzen |
 | Dialog Neues Bild | Seitenverhältnis 1600 → 1200, Grenze 70000 abgewiesen |
+| **Auswahl (Phase 3)** | Menüzustände ohne/mit Auswahl; Rechteck 100 × 50 inkl. Statusleiste und Verlauf; Hinzufügen + ⇧ Quadrat (7500 px); ⌥ Abziehen; ⌥ + Rechtsklick Schnittmenge; Ellipse; Lasso; Klick hebt Auswahl auf; Füllen mit Primärfarbe; Zauberstab 40 × 40 bei 50 %; Kopieren → Einfügen schwebend → Ziehen um (200, 100) → Fertigstellen = ein Verlaufsschritt, Pixel und Auswahl an neuer Stelle, Rückgängig; Pixel anheben + Pfeiltaste, Werkzeugwechsel stellt fertig, Ursprung transparent; Auswahl verschieben (Pixel bleiben); Ausschneiden; Alles auswählen; Umkehren; Löschen; Auf Auswahl zoomen; Zuschneiden auf Ellipse (Ecken transparent) und Rückgängig; Fensterbreite bleibt bei Auswahlwerkzeugen erhalten, schmales Fenster (1000 pt) zeigt die Zauberstab-Optionen (Auswahlmodus dann nur über ⌘/⌥), bei 1280 pt beides |
 
 ### Bildschirmfotos (Artefakt „ergebnisse“ des CI-Laufs)
-`01-hauptfenster`, `02-testbild-angepasst`, `02-zoom-1600-pixelraster`, `03-verlauf`, `04-mehrere-bilder`, `05-ebeneneigenschaften`, `06-fenster-{tools,history,layers,colors}`, `07-neues-bild`. Durchgesehen: Darstellung, Schachbrett, Pixelraster, Register, Statusleiste und Fenster entsprechen dem Entwurf. Gefundene und behobene Fehler: halbe Pixelkante am Bildrand (gebrochene Zoomgröße), Farbrad bei Schwarz komplett schwarz, Schalterzustand der Werkzeugleiste nicht erkennbar, „ungespeichert“-Punkt bei unberührtem neuen Bild.
+`01-hauptfenster`, `02-testbild-angepasst`, `08-auswahl` (Ameisenlinie und Tönung einer Ellipse ∪ Rechteck), `08-verlauf-auswahl`, `09-einfuegen-schwebend`, `10-schmal-zauberstab`, `02-zoom-1600-pixelraster`, `03-verlauf`, `04-mehrere-bilder`, `05-ebeneneigenschaften`, `06-fenster-{tools,history,layers,colors}`, `07-neues-bild`. Durchgesehen: Darstellung, Schachbrett, Pixelraster, Register, Statusleiste und Fenster entsprechen dem Entwurf. Gefundene und behobene Fehler: halbe Pixelkante am Bildrand (gebrochene Zoomgröße), Farbrad bei Schwarz komplett schwarz, Schalterzustand der Werkzeugleiste nicht erkennbar, „ungespeichert“-Punkt bei unberührtem neuen Bild.
 
 ## 3. Fehler, die durch Tests gefunden wurden
 
 | Fund | Ursache | Behoben |
 |---|---|---|
+| Fenster wurde mit Zauberstab-Optionen breiter als 1280 pt | Werkzeugleiste ohne Kürzungsregel | ja (Optionen werden in schmalen Fenstern gekürzt, Modi als Symbole) |
+| Verschieben großer Stücke hätte das ganze Bild je Mausbewegung neu berechnet (Messung 12 MP: 0,3 s + 0,5 s) | Vorschau über den vollständigen Zustand | ja (schwebendes Stück wird als eigene Ebene der Anzeige gezeichnet; Einmischen erst beim Fertigstellen) |
+| Auswahländerung setzte das ganze Bild neu zusammen | Dokument meldete jede Änderung als Inhaltsänderung | ja (gezielte Meldungen: Auswahl, Ebenen, Größe) |
 | Build-Fehler: F-Tasten-Kürzel | Funktionsreferenz verliert Standardargument | ja |
 | Build-Fehler: `selectAll` | NSWindow hat die Methode bereits | ja |
 | Rand-Artefakt rechts am Bild | Bildrahmen mit Nachkommastellen | ja (ganzzahlig gerundet) |
@@ -56,7 +60,8 @@ Stand: 04.11.2026 · Version 0.2.0 (Build 2) · Branch `phase-2`
 - Bedienung mit Maus/Trackpad von Hand (Zoomrahmen, Hand, Ziehen in der Ebenenliste, Kontextmenü der Register, Dialoge mit Enter/Esc).
 - Neustart: Fensterlage und „Zuletzt geöffnet“ bleiben erhalten.
 - Intel/Rosetta (`arch -x86_64`).
-- Performance mit großen Bildern (Phase 9; Anzeige derzeit CPU-Komposit, siehe KNOWN_ISSUES T-4).
+- Performance mit großen Bildern (Phase 9; Anzeige derzeit CPU-Komposit, siehe KNOWN_ISSUES T-4, T-5).
+- Auswahlwerkzeuge mit echter Maus/Trackpad (der Selbsttest ruft dieselben Funktionen mit Bildkoordinaten auf, aber ohne echte Mausereignisse).
 
 ## 5. Vorlage Referenzmessung
 Unverändert aus Phase 1 (Standardwerte, Grenzen, Schrittweiten je Dialog an Paint.NET 5.1.12) – siehe KNOWN_ISSUES R-1.

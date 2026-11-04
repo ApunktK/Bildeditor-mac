@@ -59,6 +59,7 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 | A-14 | Während des Verschiebens schwebender Pixel | das Stück wird über allen Ebenen angezeigt; beim Fertigstellen wird es korrekt in die aktive Ebene gemischt | flüssiges Ziehen auch bei großen Bildern (sonst Neuberechnung des ganzen Bildes je Mausbewegung) |
 | A-15 | Rücktaste ⌫ | löscht die Auswahl nur, wenn die Zeichenfläche den Fokus hat; kein Menükürzel | sonst würde ⌫ in Textfeldern die Auswahl löschen |
 | A-16 | Zuschneiden | hebt die Auswahl danach auf | Referenz ungeklärt |
+| A-17 | Schmale Fenster (unter ca. 1150 pt) | beim Zauberstab wird der Auswahlmodus in der Werkzeugleiste ausgeblendet; Modi bleiben über ⌘/⌥ erreichbar | Fenster soll nicht breiter als der Bildschirm werden |
 | A-4 | Farbrad | immer in voller Helligkeit dargestellt; Klick bei (fast) Schwarz setzt Hellwert 100 | sonst bei Schwarz unbenutzbar; Referenzverhalten ungeklärt |
 | A-5 | Standardpalette | eigene 96 Farben (16 Grau + 16 Farbtöne × 5 Abstufungen) | Referenzpalette nicht übernommen (L-4) |
 | A-6 | Werkzeugsymbole | Apple SF Symbols, Fensterschalter rechts in der Werkzeugleiste | eigene Optik (L-1) |

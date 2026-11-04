@@ -249,6 +249,11 @@ final class ToolOptionsBar: NSView {
     let finishButton = NSButton(title: "Fertigstellen", target: nil, action: nil)
     private var modeGroup: NSStackView!
     private var wandGroup: NSStackView!
+    private var stack: NSStackView!
+
+    /// Für den Selbsttest: Gruppe sichtbar und nicht wegen Platzmangel ausgeblendet.
+    var isWandGroupShown: Bool { !wandGroup.isHidden && !stack.detachedViews.contains(wandGroup) }
+    var isModeGroupShown: Bool { !modeGroup.isHidden && !stack.detachedViews.contains(modeGroup) }
 
     static func shortName(_ m: SelectionMode) -> String {
         // Kurz, damit auch schmale Fenster Platz für die Zauberstab-Optionen haben; Klartext im Tooltip.
@@ -309,7 +314,7 @@ final class ToolOptionsBar: NSView {
         finishButton.target = self; finishButton.action = #selector(finish)
         finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
 
-        let stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
+        stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
         stack.orientation = .horizontal
         stack.spacing = 10
         // Schmale Fenster: zuerst den Hinweistext, dann die Zauberstab-Optionen ausblenden statt das Fenster zu verbreitern.
