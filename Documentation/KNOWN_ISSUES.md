@@ -52,7 +52,13 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 |---|---|---|---|
 | A-1 | Speichern als PNG/JPEG/… bei mehreren Ebenen | Datei erhält das zusammengefügte Bild, **die Ebenen im Editor bleiben erhalten** (Rückfrage „Zusammengefügt speichern“) | Referenz reduziert das Bild im Editor; Verhalten wird bei R-1 nachgemessen |
 | A-2 | Ausgangszustand „ungespeichert“ | ein frisches, unverändertes neues Bild wird ohne Rückfrage geschlossen und beim Öffnen einer Datei ersetzt | entspricht dem Startbild der Referenz |
-| A-3 | Kopieren ohne Auswahl | kopiert die ganze aktive Ebene | Auswahlmodell folgt in Phase 3 (R-8) |
+| A-3 | Kopieren ohne Auswahl | kopiert die ganze aktive Ebene | übliche Erwartung; Referenz R-8 |
+| A-11 | Auswahl umkehren ohne Auswahl | wählt alles aus | Umkehrung von „nichts“; Referenz ungeklärt (E-13) |
+| A-12 | Auswahlkanten | hart (pixelgenau, ohne Kantenglättung); Modus „geglättet“ fehlt | Referenz-Standard ungeklärt (TB-24) |
+| A-13 | Verschieben angehobener Pixel | Ursprungsbereich wird transparent (0,0,0,0) | Referenz-Verhalten auf der Hintergrundebene ungeklärt |
+| A-14 | Während des Verschiebens schwebender Pixel | das Stück wird über allen Ebenen angezeigt; beim Fertigstellen wird es korrekt in die aktive Ebene gemischt | flüssiges Ziehen auch bei großen Bildern (sonst Neuberechnung des ganzen Bildes je Mausbewegung) |
+| A-15 | Rücktaste ⌫ | löscht die Auswahl nur, wenn die Zeichenfläche den Fokus hat; kein Menükürzel | sonst würde ⌫ in Textfeldern die Auswahl löschen |
+| A-16 | Zuschneiden | hebt die Auswahl danach auf | Referenz ungeklärt |
 | A-4 | Farbrad | immer in voller Helligkeit dargestellt; Klick bei (fast) Schwarz setzt Hellwert 100 | sonst bei Schwarz unbenutzbar; Referenzverhalten ungeklärt |
 | A-5 | Standardpalette | eigene 96 Farben (16 Grau + 16 Farbtöne × 5 Abstufungen) | Referenzpalette nicht übernommen (L-4) |
 | A-6 | Werkzeugsymbole | Apple SF Symbols, Fensterschalter rechts in der Werkzeugleiste | eigene Optik (L-1) |
@@ -86,4 +92,5 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 | T-1 | PDN-Schreiben ohne Zertifizierung könnte Dateien liefern, die Paint.NET nicht öffnet | Schreiben erst nach Test mit echtem Paint.NET freischalten; bis dahin natives Projektformat (FMT-02) |
 | T-2 | 10000×10000 px × mehrere Ebenen = mehrere GB | Kachelung, leere Kacheln sparen, Auslagerung, Warnung vor Speichermangel |
 | T-4 | Anzeige setzt das Bild bei jeder Änderung vollständig auf der CPU zusammen | bei sehr großen Bildern spürbar langsam | Metal-Komposit / kachelweise Aktualisierung (ARCHITECTURE), spätestens mit den Malwerkzeugen (Phase 4) |
+| T-5 | Auswahl-Operationen auf großen Bildern (12 MP, gemessen unter Linux, Release): Ellipse 0,18 s, Kontur 0,1 s, Zauberstab 0,5 s, Anheben 0,4 s, Bild neu zusammensetzen 0,5 s | spürbar bei sehr großen Bildern | kachelweise Neuzeichnung und GPU-Komposit (Phase 4/9) |
 | T-3 | Pixelgenaue Gleichheit mit Referenz bei GPU-Effekten | Toleranzen je Effekt definieren und dokumentieren (Projektvorgabe 29) |

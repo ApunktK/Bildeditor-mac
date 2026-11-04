@@ -251,8 +251,9 @@ final class ToolOptionsBar: NSView {
     private var wandGroup: NSStackView!
 
     static func shortName(_ m: SelectionMode) -> String {
-        switch m { case .replace: return "Ersetzen"; case .union: return "Hinzufügen"; case .exclude: return "Abziehen"
-        case .intersect: return "Schnittmenge"; case .xor: return "Umkehren" }
+        // Kurz, damit auch schmale Fenster Platz für die Zauberstab-Optionen haben; Klartext im Tooltip.
+        switch m { case .replace: return "Ersetzen"; case .union: return "＋"; case .exclude: return "−"
+        case .intersect: return "∩"; case .xor: return "⊕" }
     }
 
     override init(frame: NSRect) {
@@ -315,6 +316,7 @@ final class ToolOptionsBar: NSView {
         stack.setClippingResistancePriority(.defaultLow, for: .horizontal)
         stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 300), for: optionsLabel)
         stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 600), for: wandGroup)
+        stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 500), for: modeGroup)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([

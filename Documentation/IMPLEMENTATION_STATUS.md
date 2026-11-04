@@ -1,8 +1,8 @@
 # IMPLEMENTATION_STATUS.md
 
-Stand: 04.11.2026 · Version 0.2.0 (Build 2) · **Phase 2 (Grundanwendung) weitgehend abgeschlossen** – Zwischenstand, keine Vollversion.
+Stand: 04.11.2026 · Version 0.3.0 (Build 3) · **Phase 3 (Auswahl) weitgehend abgeschlossen** – Zwischenstand, keine Vollversion.
 
-> Die App startet, verwaltet mehrere Bilder, öffnet und speichert, zeigt und zoomt, und alle Ebenen-, Bild- (Drehen/Spiegeln/Reduzieren) und Verlaufsbefehle arbeiten echt. **Malen, Auswahl, Korrekturen und Effekte gibt es noch nicht**; die zugehörigen Menüpunkte und Werkzeuge sind sichtbar, aber deaktiviert und mit Hinweis auf die geplante Phase versehen.
+> Die App startet, verwaltet mehrere Bilder, öffnet und speichert, zeigt und zoomt; Ebenen-, Bild-, Verlaufs- und **Auswahlbefehle** arbeiten echt. **Malen, Korrekturen und Effekte gibt es noch nicht**; die zugehörigen Menüpunkte und Werkzeuge sind sichtbar, aber deaktiviert und mit Hinweis auf die geplante Phase versehen.
 > „Getestet“ bedeutet in dieser Datei: automatisch geprüft im CI auf macOS 15.8 (Apple Silicon) – Kern-Tests, App-Tests und Selbsttest der fertig gebauten App (TEST_REPORT.md). Eine Bedienprobe von Hand am Mac des Nutzers steht noch aus.
 
 ## Phasen
@@ -11,8 +11,8 @@ Stand: 04.11.2026 · Version 0.2.0 (Build 2) · **Phase 2 (Grundanwendung) weitg
 |---|---|---|---|
 | 1 Referenzanalyse | Funktionsmatrix, Menüinventar, Architektur, Lizenzprüfung | **abgeschlossen** (offene Referenzmessungen R-1 bis R-10) | FUNCTION_MATRIX.md (243 Funktionen), MENU_INVENTORY.md, ARCHITECTURE.md, SOURCE_CODE_ANALYSIS.md, THIRD_PARTY_LICENSES.md |
 | 2 Grundanwendung | App, Hauptfenster, Menüs, Leisten, Register, Fenster, Zeichenfläche, Dateiverwaltung | **weitgehend abgeschlossen** – offen: Lineale, Einstellungsfenster, Lokalisierungsdateien | Bildeditor.app (Universal), DMG, Selbsttest 72/72 |
-| 3 Bildbearbeitungsengine | Auswahl, Zeichnen, Maus, Alpha, Ausschneiden/Einfügen | nicht begonnen | – |
-| 4 Werkzeuge | 22 Werkzeuge (umgesetzt: Zoom, Hand) | nicht begonnen | – |
+| 3 Bildbearbeitungsengine | Auswahl, Zeichnen, Maus, Alpha, Ausschneiden/Einfügen | **Auswahl weitgehend abgeschlossen** – offen: Auswahl als JSON kopieren/einfügen, feste Größe/Verhältnis, Drehen/Skalieren beim Verschieben, Lineale; Zeichen-Engine folgt mit Phase 4 | Selbsttest 106/106 |
+| 4 Werkzeuge | 22 Werkzeuge (umgesetzt: Zoom, Hand, Rechteck-, Ellipsen-, Lassoauswahl, Zauberstab, Pixel/Auswahl verschieben) | teilweise | – |
 | 5 Ebenen und Farben | Ebenen ✔ (vorgezogen), 14 Mischmodi ✔, Farbenfenster ✔ (Grundfunktion), Bildgröße/Leinwand, Drehen/Zoomen | teilweise vorgezogen | siehe Matrix L-xx, BM-01, C-xx |
 | 6 Korrekturen und Effekte | 13 Korrekturen, 40 Effekte | nicht begonnen | – |
 | 7 Formate und Projekte | Formate über ImageIO ✔ (PNG, JPEG, BMP, TIFF, GIF, HEIC, TGA); natives Projekt, PDN, Farbprofil, Scanner | teilweise vorgezogen | siehe Matrix FMT-xx |
@@ -24,14 +24,14 @@ Stand: 04.11.2026 · Version 0.2.0 (Build 2) · **Phase 2 (Grundanwendung) weitg
 
 | Status-Stufe | Anzahl |
 |---|---|
-| implementiert und getestet | 49 |
+| implementiert und getestet | 68 |
 | implementiert, aber noch nicht getestet | 41 |
-| teilweise implementiert | 14 |
-| nicht implementiert | 139 |
+| teilweise implementiert | 18 |
+| nicht implementiert | 116 |
 | technisch nicht möglich | 0 (Kandidaten: JPEG XR FMT-06, WebP-Schreiben FMT-13 über ImageIO) |
 | wegen fehlender Referenz ungeklärt | 73 Einträge enthalten ungeklärte Teilaspekte |
 
-Menübefehle laut Befehlstabelle der App: **57 von 133 umgesetzt**; die übrigen 76 sind deaktiviert (vom Selbsttest geprüft) und tragen ihre geplante Phase im Tooltip.
+Menübefehle laut Befehlstabelle der App: **67 von 134 umgesetzt**; die übrigen 67 sind deaktiviert (vom Selbsttest geprüft) und tragen ihre geplante Phase im Tooltip.
 
 ## Was funktioniert (Phase 2)
 
@@ -46,9 +46,17 @@ Menübefehle laut Befehlstabelle der App: **57 von 133 umgesetzt**; die übrigen
 - **Zwischenablage:** Kopieren (ganze Ebene), Zusammengefügt kopieren, In neue Ebene einfügen (mit Leinwand-Rückfrage), In neues Bild einfügen.
 - **Build:** Universal (arm64 + x86_64), ad-hoc signiert, Hardened Runtime, DMG mit Verknüpfung „Programme“.
 
+## Neu in Phase 3 (0.3.0)
+
+- **Auswahlwerkzeuge:** Rechteck (⇧ Quadrat), Ellipse (⇧ Kreis), Lasso, Zauberstab (Flutmodus zusammenhängend/global, ⇧ kehrt um, Toleranz 0–100 %, Stichprobe Ebene/Bild; Farbvergleich aus Paint.NET 3.36, MIT).
+- **Auswahlmodi:** Ersetzen, Hinzufügen, Abziehen, Schnittmenge, Umkehren – in der Werkzeugleiste und über ⌘/⌥ mit linker bzw. rechter Maustaste. Klick ohne Aufziehen hebt die Auswahl auf.
+- **Anzeige:** animierte Ameisenlinie, blaue Tönung bei aktivem Auswahl-/Verschiebewerkzeug, Auswahlgröße in der Statusleiste.
+- **Verschieben:** „Ausgewählte Pixel verschieben“ (Maus, Pfeiltasten 1 px / ⌘ 10 px, ⌘ = Kopie) – die Pixel bleiben schwebend, bis „Fertigstellen“ (Eingabetaste, Esc, Knopf, Werkzeugwechsel oder ein anderer Befehl); dann genau ein Verlaufsschritt. „Auswahl verschieben“ bewegt nur die Kontur.
+- **Bearbeiten:** Ausschneiden, Kopieren (mit Auswahl), Zusammengefügt kopieren, Einfügen (schwebend), In neue Ebene einfügen (schwebend), Auswahl löschen (⌫), Auswahl füllen (⌥⌫, Primärfarbe), Auswahl umkehren, Alles auswählen, Auswahl aufheben, Fertigstellen.
+- **Bild/Ansicht:** Auf Auswahl zuschneiden (nicht rechteckig → Ecken transparent), Auf Auswahl zoomen. Drehen/Spiegeln des Bildes nimmt die Auswahl mit.
+
 ## Nächste Schritte
 
 1. Bedienprobe von Hand auf dem Mac des Nutzers (DMG aus diesem Stand).
-2. Phase 3: Auswahlmodell (Rechteck/Ellipse/Lasso/Zauberstab-Grundlage, Ameisenlinie), Ausschneiden/Einfügen/Löschen/Füllen, Zuschneiden, Lineale.
-3. Phase 4: Malwerkzeuge (Pinsel, Stift, Radierer, Farbeimer, Pipette, Verlauf, Linie, Formen, Text, Kopierstempel, Umfärben).
-4. Referenzmessung (R-1) für Standardwerte, sobald jemand Paint.NET 5.1.12 unter Windows bedienen kann.
+2. Phase 4: Malwerkzeuge (Pinsel, Stift, Radierer, Farbeimer, Pipette, Verlauf, Linie, Formen, Text, Kopierstempel, Umfärben).
+3. Referenzmessung (R-1) für Standardwerte, sobald jemand Paint.NET 5.1.12 unter Windows bedienen kann.

@@ -436,6 +436,8 @@ final class SelfTest {
             w.setFrame(NSRect(x: 40, y: 40, width: 1000, height: 700), display: true)
             pump(0.3)
             check("Schmales Fenster mit Zauberstab-Optionen (1000 pt)", abs(w.frame.width - 1000) < 1, "\(w.frame.width)")
+            let tol = main.toolOptions.toleranceSlider
+            check("Toleranz im schmalen Fenster sichtbar", tol.window != nil && tol.visibleRect.width > 50, "\(tol.visibleRect)")
             snapshot(w.contentView, "10-schmal-zauberstab")
             w.setFrame(NSRect(x: 40, y: 40, width: 1280, height: 820), display: true)
         }
