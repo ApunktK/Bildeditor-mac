@@ -66,7 +66,7 @@ final class EditorWindow: NSWindow {
     @objc func copy(_ sender: Any?) { AppController.shared.commands.perform("edit.copy") }
     @objc func paste(_ sender: Any?) { AppController.shared.commands.perform("edit.paste") }
     @objc func cut(_ sender: Any?) { AppController.shared.commands.perform("edit.cut") }
-    @objc func selectAll(_ sender: Any?) { AppController.shared.commands.perform("edit.selectAll") }
+    @objc override func selectAll(_ sender: Any?) { AppController.shared.commands.perform("edit.selectAll") }
     @objc func delete(_ sender: Any?) { AppController.shared.commands.perform("edit.eraseSelection") }
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {

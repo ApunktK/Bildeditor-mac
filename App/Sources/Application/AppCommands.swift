@@ -120,7 +120,7 @@ extension AppController {
         r.register(Command("layer.moveUp", "Ebene nach oben", enabled: docIf { $0.canMoveLayer(.up) }, run: doc { $0.moveLayer(.up) }))
         r.register(Command("layer.moveDown", "Ebene nach unten", enabled: docIf { $0.canMoveLayer(.down) }, run: doc { $0.moveLayer(.down) }))
         r.register(Command("layer.moveBottom", "Ebene ganz nach unten", enabled: docIf { $0.canMoveLayer(.bottom) }, run: doc { $0.moveLayer(.bottom) }))
-        r.register(Command("layer.properties", "Ebeneneigenschaften …", shortcut: fn(NSF4FunctionKey), enabled: hasDoc,
+        r.register(Command("layer.properties", "Ebeneneigenschaften …", shortcut: fn(NSF4FunctionKey, []), enabled: hasDoc,
                            run: { LayerPropertiesDialog.runForActiveLayer() }))
 
         // Korrekturen (Phase 6)
@@ -149,7 +149,7 @@ extension AppController {
 
         // Fenster
         for (i, p) in PanelID.allCases.enumerated() {
-            r.register(Command("window.\(p.rawValue)", p.title, shortcut: fn(NSF5FunctionKey + i),
+            r.register(Command("window.\(p.rawValue)", p.title, shortcut: fn(NSF5FunctionKey + i, []),
                                checked: { [unowned self] in self.panels?.isVisible(p) ?? false },
                                run: { [unowned self] in self.panels.toggle(p) }))
         }
@@ -161,7 +161,7 @@ extension AppController {
                            enabled: { [unowned self] in self.sessions.count > 1 }, run: { [unowned self] in self.activateNext(-1) }))
 
         // Hilfe
-        r.register(Command("help.docs", "Bildeditor-Hilfe", shortcut: fn(NSF1FunctionKey), run: {
+        r.register(Command("help.docs", "Bildeditor-Hilfe", shortcut: fn(NSF1FunctionKey, []), run: {
             NSWorkspace.shared.open(URL(string: "https://github.com/ApunktK/Bildeditor-mac#readme")!)
         }))
         r.register(Command("help.report", "Fehler melden …", run: {
