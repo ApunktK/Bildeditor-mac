@@ -86,6 +86,8 @@ final class LayersPanelController: NSViewController, NSTableViewDataSource, NSTa
         for (id, b) in buttons { b.isEnabled = reg.canPerform(id) }
     }
 
+    func buttonEnabled(_ id: String) -> Bool { buttons.first { $0.0 == id }?.1.isEnabled ?? false }
+
     @objc private func buttonClicked(_ sender: NSButton) {
         guard var id = sender.identifier?.rawValue else { return }
         if NSEvent.modifierFlags.contains(.command) {

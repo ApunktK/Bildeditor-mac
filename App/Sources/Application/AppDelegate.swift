@@ -41,8 +41,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 /// Leitet Standardaktionen (Rückgängig, Kopieren …) an die Befehlstabelle weiter, außer ein Textfeld bearbeitet gerade.
 enum StandardActionRouting {
     static let map: [Selector: String] = [
-        Selector(("undo:")): "edit.undo",
-        Selector(("redo:")): "edit.redo",
+        NSSelectorFromString("undo:"): "edit.undo",
+        NSSelectorFromString("redo:"): "edit.redo",
         #selector(NSText.cut(_:)): "edit.cut",
         #selector(NSText.copy(_:)): "edit.copy",
         #selector(NSText.paste(_:)): "edit.paste",
@@ -72,8 +72,8 @@ final class EditorWindow: NSWindow {
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         if let action = item.action, let id = StandardActionRouting.map[action] {
             if StandardActionRouting.isTextEditing(self) {
-                if action == Selector(("undo:")) { return undoManager?.canUndo ?? false }
-                if action == Selector(("redo:")) { return undoManager?.canRedo ?? false }
+                if action == NSSelectorFromString("undo:") { return undoManager?.canUndo ?? false }
+                if action == NSSelectorFromString("redo:") { return undoManager?.canRedo ?? false }
             }
             return AppController.shared.commands.canPerform(id)
         }
@@ -96,10 +96,10 @@ final class EditorPanel: NSPanel {
 
     override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
         if let action = item.action, let id = StandardActionRouting.map[action],
-           action == Selector(("undo:")) || action == Selector(("redo:")) || action == #selector(NSText.copy(_:)) || action == #selector(NSText.paste(_:)) {
+           action == NSSelectorFromString("undo:") || action == NSSelectorFromString("redo:") || action == #selector(NSText.copy(_:)) || action == #selector(NSText.paste(_:)) {
             if StandardActionRouting.isTextEditing(self) {
-                if action == Selector(("undo:")) { return undoManager?.canUndo ?? false }
-                if action == Selector(("redo:")) { return undoManager?.canRedo ?? false }
+                if action == NSSelectorFromString("undo:") { return undoManager?.canUndo ?? false }
+                if action == NSSelectorFromString("redo:") { return undoManager?.canRedo ?? false }
             }
             return AppController.shared.commands.canPerform(id)
         }

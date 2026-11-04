@@ -44,8 +44,23 @@ final class SelfTest {
         view.displayIfNeeded()
         guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { check("Bildschirmfoto \(name)", false); return }
         view.cacheDisplay(in: view.bounds, to: rep)
+        // Auf Fensterhintergrund legen (die Inhaltsansicht selbst ist durchsichtig).
+        let final = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: rep.pixelsWide, pixelsHigh: rep.pixelsHigh, bitsPerSample: 8,
+                                     samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                     bytesPerRow: 0, bitsPerPixel: 0) ?? rep
+        final.size = rep.size
+        if final !== rep, let gc = NSGraphicsContext(bitmapImageRep: final) {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = gc
+            view.effectiveAppearance.performAsCurrentDrawingAppearance {
+                NSColor.windowBackgroundColor.setFill()
+                NSRect(origin: .zero, size: rep.size).fill()
+            }
+            rep.draw(in: NSRect(origin: .zero, size: rep.size))
+            NSGraphicsContext.restoreGraphicsState()
+        }
         let url = out.appendingPathComponent(name + ".png")
-        if let data = rep.representation(using: .png, properties: [:]), (try? data.write(to: url)) != nil {
+        if let data = final.representation(using: .png, properties: [:]), (try? data.write(to: url)) != nil {
             shots.append(name + ".png")
         } else {
             check("Bildschirmfoto \(name)", false, "Schreiben fehlgeschlagen")
@@ -115,6 +130,7 @@ final class SelfTest {
         let layersVC = ctrl.panels.controllers[.layers] as? LayersPanelController
         check("Ebenenfenster zeigt 3 Ebenen", layersVC?.table.numberOfRows == 3)
         check("Ebenenfenster: aktive Ebene markiert", layersVC?.table.selectedRow == 1)
+        check("Ebenenfenster: Knopf „Neue Ebene“ aktiv", layersVC?.buttonEnabled("layer.add") == true)
         _ = perform("layer.mergeDown")
         check("Zusammenführen", doc.layers.count == 2)
         _ = perform("layer.delete")
@@ -166,11 +182,22 @@ final class SelfTest {
         check("Verkleinern → 150 %", ctrl.active?.zoom == 150)
         _ = perform("view.actualSize")
         check("Originalgröße", ctrl.active?.zoom == 100)
-        _ = perform("view.pixelGrid")
-        main.canvas.setZoom(800, anchor: nil)
+        // Testbild mit Verlauf und Halbtransparenz für sichtbare Bildschirmfotos
+        let pattern = Self.testPattern(PixelSize(1200, 800))
+        ctrl.add(Document(state: DocumentState(size: pattern.size, dpi: 96, layers: [Layer(name: "Hintergrund", surface: pattern, isBackground: true)],
+                                               activeLayerIndex: 0), name: "Testbild", fileURL: nil, historyName: "Bild öffnen", historyKind: .openImage))
         pump()
-        snapshot(window.contentView, "02-zoom-800-pixelraster")
+        snapshot(window.contentView, "02-testbild-angepasst")
         _ = perform("view.pixelGrid")
+        check("Pixelraster an", ctrl.showPixelGrid && main.toolbarRow.buttonStates.contains { $0.id == "view.pixelGrid" })
+        main.canvas.setZoom(1600, anchor: nil)
+        main.canvas.center(onImage: CGPoint(x: 600, y: 400))
+        pump()
+        snapshot(window.contentView, "02-zoom-1600-pixelraster")
+        _ = perform("view.pixelGrid")
+        if let t = ctrl.active { ctrl.close(t) }
+        pump()
+        check("Testbild geschlossen, voriges Bild aktiv", ctrl.document === doc)
         _ = perform("view.zoomFit")
         _ = perform("view.unit.centimeters")
         check("Einheit Zentimeter", main.statusBar.displayedSize == "21,17 × 15,88 cm", main.statusBar.displayedSize)
@@ -300,6 +327,27 @@ final class SelfTest {
         try? Self.lines.joined(separator: "\n").write(to: out.appendingPathComponent("selftest.log"), atomically: true, encoding: .utf8)
         Self.log("Selbsttest: \(results.count - failed) bestanden, \(failed) fehlgeschlagen")
         exit(failed == 0 ? 0 : 1)
+    }
+
+    /// Farbverlauf mit halbtransparenten Kreisen und durchsichtigem Rand.
+    static func testPattern(_ size: PixelSize) -> TiledSurface {
+        var s = TiledSurface(size: size)
+        let w = Double(size.width), h = Double(size.height)
+        for y in 0..<size.height {
+            for x in 0..<size.width {
+                let fx = Double(x) / w, fy = Double(y) / h
+                var c = HSV(h: fx * 300, s: 70, v: 55 + 45 * (1 - fy)).color()
+                for (cx, cy, r, a) in [(0.3, 0.4, 0.18, 200.0), (0.65, 0.55, 0.22, 120.0), (0.5, 0.25, 0.1, 255.0)] {
+                    let dx = fx - cx, dy = (fy - cy) * h / w
+                    if (dx * dx + dy * dy).squareRoot() < r {
+                        c = BlendMode.normal.blend(bottom: c, top: ColorBgra(r: 255, g: 255, b: 255, a: UInt8(a)))
+                    }
+                }
+                if x < 40 || y < 40 { c.a = UInt8(min(255, (min(x, y) * 255) / 40)) }
+                s[x, y] = c
+            }
+        }
+        return s
     }
 
     static var architecture: String {

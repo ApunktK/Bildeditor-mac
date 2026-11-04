@@ -32,9 +32,9 @@ extension AppController {
                            run: { [unowned self] in if let s = self.active { self.close(s) } }))
 
         // Bearbeiten
-        r.register(Command("edit.undo", "Rückgängig", shortcut: Shortcut("z"), standardAction: Selector(("undo:")),
+        r.register(Command("edit.undo", "Rückgängig", shortcut: Shortcut("z"), standardAction: NSSelectorFromString("undo:"),
                            enabled: docIf { $0.canUndo }, run: doc { $0.undo() }))
-        r.register(Command("edit.redo", "Wiederholen", shortcut: Shortcut("z", [.command, .shift]), standardAction: Selector(("redo:")),
+        r.register(Command("edit.redo", "Wiederholen", shortcut: Shortcut("z", [.command, .shift]), standardAction: NSSelectorFromString("redo:"),
                            enabled: docIf { $0.canRedo }, run: doc { $0.redo() }))
         r.register(Command("edit.cut", "Ausschneiden", shortcut: Shortcut("x"), standardAction: #selector(NSText.cut(_:)), planned: 3))
         r.register(Command("edit.copy", "Kopieren", shortcut: Shortcut("c"), standardAction: #selector(NSText.copy(_:)), enabled: hasDoc,

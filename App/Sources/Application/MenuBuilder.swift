@@ -92,7 +92,7 @@ final class RecentFilesMenuDelegate: NSObject, NSMenuDelegate {
             it.isEnabled = false
             menu.addItem(it)
         }
-        for (i, url) in files.enumerated() {
+        for url in files {
             let it = NSMenuItem(title: url.lastPathComponent, action: #selector(openRecent(_:)), keyEquivalent: "")
             it.target = self
             it.representedObject = url

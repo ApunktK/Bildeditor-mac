@@ -295,7 +295,7 @@ final class PrimarySecondaryView: NSView {
 /// Farbrad: Winkel = Farbton, Abstand zur Mitte = Sättigung, Hellwert der aktuellen Farbe bleibt.
 /// Linksklick → aktives Feld, Rechtsklick → inaktives Feld (Referenz).
 final class ColorWheelView: NSView {
-    var current = HSV(h: 0, s: 0, v: 100) { didSet { if current.v != oldValue.v { cachedWheel = nil }; needsDisplay = true } }
+    var current = HSV(h: 0, s: 0, v: 100) { didSet { needsDisplay = true } }
     var onPick: ((HSV, Bool) -> Void)?
     private var cachedWheel: NSImage?
     private var dragToInactive = false
@@ -316,7 +316,8 @@ final class ColorWheelView: NSView {
     private func wheelImage() -> NSImage {
         if let c = cachedWheel { return c }
         let n = Int(radius * 2)
-        let v = max(current.v, 0)
+        // Rad immer in voller Helligkeit, damit es auch bei Schwarz als Farbe nutzbar ist.
+        let v = 100.0
         var bytes = [UInt8](repeating: 0, count: n * n * 4)
         let r = Double(n) / 2
         for y in 0..<n {
@@ -362,7 +363,8 @@ final class ColorWheelView: NSView {
         if m.contains(.shift) { h = (h / 15).rounded() * 15 }          // Speichen
         if m.contains(.control), let st = dragStart { s = st.s }          // gleicher Radius
         if m.contains(.option), let st = dragStart { h = st.h }           // eine Speiche
-        return HSV(h: h.truncatingRemainder(dividingBy: 360), s: s, v: current.v)
+        // Hellwert bleibt; bei (fast) Schwarz volle Helligkeit, sonst bliebe die Wahl wirkungslos.
+        return HSV(h: h.truncatingRemainder(dividingBy: 360), s: s, v: current.v < 1 ? 100 : current.v)
     }
 
     override func mouseDown(with e: NSEvent) { dragToInactive = false; dragStart = current; onPick?(hsv(at: e), false) }

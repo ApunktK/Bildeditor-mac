@@ -25,7 +25,7 @@ final class CanvasView: NSView {
         guard let s = controller?.session else { return .zero }
         let sc = controller!.scale
         return NSRect(x: imageOrigin.x, y: imageOrigin.y,
-                      width: CGFloat(s.document.size.width) * sc, height: CGFloat(s.document.size.height) * sc)
+                      width: (CGFloat(s.document.size.width) * sc).rounded(), height: (CGFloat(s.document.size.height) * sc).rounded())
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -192,7 +192,7 @@ final class CanvasController: NSObject {
             canvasView.needsDisplay = true
             return
         }
-        let iw = CGFloat(s.document.size.width) * scale, ih = CGFloat(s.document.size.height) * scale
+        let iw = (CGFloat(s.document.size.width) * scale).rounded(), ih = (CGFloat(s.document.size.height) * scale).rounded()
         let size = NSSize(width: max(iw, avail.width), height: max(ih, avail.height))
         canvasView.setFrameSize(size)
         canvasView.imageOrigin = NSPoint(x: floor((size.width - iw) / 2), y: floor((size.height - ih) / 2))

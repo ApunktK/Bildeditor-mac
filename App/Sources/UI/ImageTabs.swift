@@ -109,7 +109,7 @@ final class ImageTabItem: NSView {
     func refresh() {
         thumb.image = checkerThumb()
         label.stringValue = session.title
-        dirtyDot.isHidden = !session.document.isDirty
+        dirtyDot.isHidden = !session.document.needsSavePrompt
         toolTip = session.document.fileURL?.path ?? session.title
         needsDisplay = true
     }

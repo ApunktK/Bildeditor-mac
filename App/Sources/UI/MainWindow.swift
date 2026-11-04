@@ -127,7 +127,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         if let d = AppController.shared.document {
             w.title = "\(d.displayName) – Bildeditor"
             w.representedURL = d.fileURL
-            w.isDocumentEdited = d.isDirty
+            w.isDocumentEdited = d.needsSavePrompt
         } else {
             w.title = "Bildeditor"
             w.representedURL = nil
@@ -201,7 +201,7 @@ final class CommandToolbar: NSView {
         if img == nil { b.title = String((c?.title ?? "?").prefix(2)) }
         b.identifier = NSUserInterfaceItemIdentifier(e.id)
         b.bezelStyle = .recessed
-        b.showsBorderOnlyWhileMouseInside = !e.toggle
+        b.showsBorderOnlyWhileMouseInside = true
         b.setButtonType(e.toggle ? .pushOnPushOff : .momentaryPushIn)
         b.imagePosition = .imageOnly
         b.toolTip = c.map { cmd in
@@ -222,7 +222,12 @@ final class CommandToolbar: NSView {
         for (e, b) in buttons {
             guard let c = reg[e.id] else { b.isEnabled = false; continue }
             b.isEnabled = c.canRun
-            if e.toggle { b.state = (c.isChecked?() ?? false) ? .on : .off }
+            if e.toggle {
+                let on = c.isChecked?() ?? false
+                b.state = on ? .on : .off
+                b.contentTintColor = on ? .controlAccentColor : nil
+                b.showsBorderOnlyWhileMouseInside = !on
+            }
         }
     }
 
