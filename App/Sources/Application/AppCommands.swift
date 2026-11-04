@@ -36,29 +36,43 @@ extension AppController {
                            enabled: docIf { $0.canUndo }, run: doc { $0.undo() }))
         r.register(Command("edit.redo", "Wiederholen", shortcut: Shortcut("z", [.command, .shift]), standardAction: NSSelectorFromString("redo:"),
                            enabled: docIf { $0.canRedo }, run: doc { $0.redo() }))
-        r.register(Command("edit.cut", "Ausschneiden", shortcut: Shortcut("x"), standardAction: #selector(NSText.cut(_:)), planned: 3))
+        let hasSel: () -> Bool = { [unowned self] in self.document?.hasSelection ?? false }
+        r.register(Command("edit.cut", "Ausschneiden", shortcut: Shortcut("x"), standardAction: #selector(NSText.cut(_:)), enabled: hasSel,
+                           run: { [unowned self] in
+                               guard let d = self.document, let px = d.cutSelection() else { return }
+                               self.copyToPasteboard(px, dpi: d.state.dpi) }))
         r.register(Command("edit.copy", "Kopieren", shortcut: Shortcut("c"), standardAction: #selector(NSText.copy(_:)), enabled: hasDoc,
-                           run: { [unowned self] in if let d = self.document { self.copyToPasteboard(d.activeLayer.surface, dpi: d.state.dpi) } }))
+                           run: { [unowned self] in if let d = self.document { self.copyToPasteboard(d.selectedPixels(merged: false), dpi: d.state.dpi) } }))
         r.register(Command("edit.copyMerged", "Zusammengefügt kopieren", shortcut: Shortcut("c", [.command, .shift]), enabled: hasDoc,
-                           run: { [unowned self] in if let d = self.document { self.copyToPasteboard(d.flattenedSurface(), dpi: d.state.dpi) } }))
-        r.register(Command("edit.paste", "Einfügen", shortcut: Shortcut("v"), standardAction: #selector(NSText.paste(_:)), planned: 3))
+                           run: { [unowned self] in if let d = self.document { self.copyToPasteboard(d.selectedPixels(merged: true), dpi: d.state.dpi) } }))
+        r.register(Command("edit.paste", "Einfügen", shortcut: Shortcut("v"), standardAction: #selector(NSText.paste(_:)),
+                           enabled: { [unowned self] in self.document != nil && self.pasteboardHasImage },
+                           run: { [unowned self] in self.pasteFloating(intoNewLayer: false) }))
         r.register(Command("edit.pasteNewLayer", "In neue Ebene einfügen", shortcut: Shortcut("v", [.command, .shift]),
                            enabled: { [unowned self] in self.document != nil && self.pasteboardHasImage },
-                           run: { [unowned self] in self.pasteIntoNewLayer() }))
+                           run: { [unowned self] in self.pasteFloating(intoNewLayer: true) }))
         r.register(Command("edit.pasteNewImage", "In neues Bild einfügen", shortcut: Shortcut("v", [.command, .option]),
                            enabled: { [unowned self] in self.pasteboardHasImage },
                            run: { [unowned self] in self.pasteIntoNewImage() }))
-        r.register(Command("edit.copySelection", "Auswahl kopieren", shortcut: Shortcut("c", [.command, .option, .shift]), planned: 3))
-        r.register(Command("edit.pasteSelection.replace", "Ersetzen", shortcut: Shortcut("v", [.command, .option, .shift]), planned: 3))
-        r.register(Command("edit.pasteSelection.union", "Hinzufügen (Vereinigung)", planned: 3))
-        r.register(Command("edit.pasteSelection.exclude", "Ausschließen", planned: 3))
-        r.register(Command("edit.pasteSelection.intersect", "Schnittmenge", planned: 3))
-        r.register(Command("edit.pasteSelection.xor", "Umkehren (XOR)", planned: 3))
-        r.register(Command("edit.eraseSelection", "Auswahl löschen", shortcut: Shortcut("\u{8}", []), standardAction: #selector(NSText.delete(_:)), planned: 3))
-        r.register(Command("edit.fillSelection", "Auswahl füllen", shortcut: Shortcut("\u{8}", [.option]), planned: 3))
-        r.register(Command("edit.invertSelection", "Auswahl umkehren", shortcut: Shortcut("i"), planned: 3))
-        r.register(Command("edit.selectAll", "Alles auswählen", shortcut: Shortcut("a"), standardAction: #selector(NSText.selectAll(_:)), planned: 3))
-        r.register(Command("edit.deselect", "Auswahl aufheben", shortcut: Shortcut("d"), planned: 3))
+        r.register(Command("edit.copySelection", "Auswahl kopieren", shortcut: Shortcut("c", [.command, .option, .shift]), planned: 5))
+        r.register(Command("edit.pasteSelection.replace", "Ersetzen", shortcut: Shortcut("v", [.command, .option, .shift]), planned: 5))
+        r.register(Command("edit.pasteSelection.union", "Hinzufügen (Vereinigung)", planned: 5))
+        r.register(Command("edit.pasteSelection.exclude", "Ausschließen", planned: 5))
+        r.register(Command("edit.pasteSelection.intersect", "Schnittmenge", planned: 5))
+        r.register(Command("edit.pasteSelection.xor", "Umkehren (XOR)", planned: 5))
+        // ⌫ und ⌥⌫ verarbeitet die Zeichenfläche selbst (nicht als Menükürzel, sonst fehlte die Rücktaste in Textfeldern).
+        r.register(Command("edit.eraseSelection", "Auswahl löschen", standardAction: #selector(NSText.delete(_:)), enabled: hasSel,
+                           run: doc { $0.eraseSelection() }))
+        r.register(Command("edit.fillSelection", "Auswahl füllen", enabled: hasSel,
+                           run: { [unowned self] in self.document?.fillSelection(with: self.colors.primary) }))
+        r.register(Command("edit.invertSelection", "Auswahl umkehren", shortcut: Shortcut("i"), enabled: hasDoc, run: doc { $0.invertSelection() }))
+        r.register(Command("edit.selectAll", "Alles auswählen", shortcut: Shortcut("a"), standardAction: #selector(NSText.selectAll(_:)),
+                           enabled: hasDoc, run: doc { $0.selectAll() }))
+        r.register(Command("edit.deselect", "Auswahl aufheben", shortcut: Shortcut("d"),
+                           enabled: { [unowned self] in (self.document?.hasSelection ?? false) || self.document?.floating != nil },
+                           run: doc { $0.settlePreview(); $0.deselect() }))
+        r.register(Command("edit.finish", "Fertigstellen", enabled: { [unowned self] in self.document?.floating != nil },
+                           run: { [unowned self] in self.finishFloating() }))
 
         // Ansicht
         r.register(Command("view.zoomIn", "Vergrößern", shortcut: Shortcut("+"), enabled: hasDoc,
@@ -67,19 +81,23 @@ extension AppController {
                            run: { [unowned self] in self.mainWindow.canvas.zoomStep(-1) }))
         r.register(Command("view.zoomFit", "An Fenster anpassen", shortcut: Shortcut("b"), enabled: hasDoc,
                            run: { [unowned self] in self.mainWindow.canvas.zoomToFit() }))
-        r.register(Command("view.zoomSelection", "Auf Auswahl zoomen", shortcut: Shortcut("b", [.command, .shift]), planned: 3))
+        r.register(Command("view.zoomSelection", "Auf Auswahl zoomen", shortcut: Shortcut("b", [.command, .shift]), enabled: hasSel,
+                           run: { [unowned self] in
+                               if let b = self.document?.selectionBounds {
+                                   self.mainWindow.canvas.zoom(toImageRect: CGRect(x: b.minX, y: b.minY, width: b.width, height: b.height)) } }))
         r.register(Command("view.actualSize", "Originalgröße", shortcut: Shortcut("0"), enabled: hasDoc,
                            run: { [unowned self] in self.mainWindow.canvas.setZoom(100, anchor: nil) }))
         r.register(Command("view.pixelGrid", "Pixelraster", checked: { [unowned self] in self.showPixelGrid },
                            run: { [unowned self] in self.showPixelGrid.toggle() }))
-        r.register(Command("view.rulers", "Lineale", planned: 3))
+        r.register(Command("view.rulers", "Lineale", planned: 5))
         for (u, t) in [(MeasurementUnit.pixels, "Pixel"), (.inches, "Zoll"), (.centimeters, "Zentimeter")] {
             r.register(Command("view.unit.\(u.rawValue)", t, checked: { [unowned self] in self.unit == u },
                                run: { [unowned self] in self.unit = u }))
         }
 
         // Bild
-        r.register(Command("image.crop", "Auf Auswahl zuschneiden", shortcut: Shortcut("x", [.command, .shift]), planned: 3))
+        r.register(Command("image.crop", "Auf Auswahl zuschneiden", shortcut: Shortcut("x", [.command, .shift]), enabled: hasSel,
+                           run: doc { $0.cropToSelection() }))
         r.register(Command("image.resize", "Bildgröße ändern …", shortcut: Shortcut("r"), planned: 5))
         r.register(Command("image.canvasSize", "Leinwandgröße …", shortcut: Shortcut("r", [.command, .shift]), planned: 5))
         r.register(Command("image.flipH", "Horizontal spiegeln", enabled: hasDoc, run: doc { $0.transformImage(.flipHorizontal) }))
@@ -200,7 +218,7 @@ extension AppController {
                                                           .cmd("edit.pasteSelection.exclude"), .cmd("edit.pasteSelection.intersect"),
                                                           .cmd("edit.pasteSelection.xor")]),
                             .separator, .cmd("edit.eraseSelection"), .cmd("edit.fillSelection"), .cmd("edit.invertSelection"),
-                            .cmd("edit.selectAll"), .cmd("edit.deselect")]),
+                            .cmd("edit.selectAll"), .cmd("edit.deselect"), .separator, .cmd("edit.finish")]),
             ("Ansicht", [.cmd("view.zoomIn"), .cmd("view.zoomOut"), .cmd("view.zoomFit"), .cmd("view.zoomSelection"),
                          .cmd("view.actualSize"), .separator, .cmd("view.pixelGrid"), .cmd("view.rulers"), .separator,
                          .cmd("view.unit.pixels"), .cmd("view.unit.inches"), .cmd("view.unit.centimeters")]),

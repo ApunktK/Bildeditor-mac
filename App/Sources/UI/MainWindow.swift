@@ -34,6 +34,7 @@ final class MainWindowController: NSWindowController, NSWindowDelegate {
         nc.addObserver(self, selector: #selector(refreshControls), name: NSApplication.didBecomeActiveNotification, object: nil)
 
         canvas.onPointerMoved = { [weak self] p in self?.statusBar.setPointer(p) }
+        canvas.onSelectionInfo = { [weak self] size in self?.statusBar.setSelectionSize(size) }
         canvas.onZoomChanged = { [weak self] in self?.statusBar.refresh(); self?.toolbarRow.refresh() }
         documentsChanged()
         toolChanged()
@@ -239,6 +240,20 @@ final class CommandToolbar: NSView {
 final class ToolOptionsBar: NSView {
     let toolPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let optionsLabel = NSTextField(labelWithString: "")
+    // Auswahlwerkzeuge
+    let modeControl = NSSegmentedControl(labels: SelectionMode.allCases.map { Self.shortName($0) }, trackingMode: .selectOne, target: nil, action: nil)
+    let floodPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let samplePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let toleranceSlider = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
+    private let toleranceLabel = NSTextField(labelWithString: "50 %")
+    let finishButton = NSButton(title: "Fertigstellen", target: nil, action: nil)
+    private var modeGroup: NSStackView!
+    private var wandGroup: NSStackView!
+
+    static func shortName(_ m: SelectionMode) -> String {
+        switch m { case .replace: return "Ersetzen"; case .union: return "Hinzufügen"; case .exclude: return "Abziehen"
+        case .intersect: return "Schnittmenge"; case .xor: return "Umkehren" }
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -258,9 +273,44 @@ final class ToolOptionsBar: NSView {
         optionsLabel.textColor = .secondaryLabelColor
         optionsLabel.lineBreakMode = .byTruncatingTail
         optionsLabel.font = .systemFont(ofSize: 11)
-        let stack = NSStackView(views: [toolLabel, toolPopup, optionsLabel])
+        optionsLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        modeControl.controlSize = .small
+        modeControl.target = self; modeControl.action = #selector(modeChanged)
+        for (i, m) in SelectionMode.allCases.enumerated() { modeControl.setToolTip("Auswahlmodus: \(m.displayName)", forSegment: i) }
+        let modeLabel = NSTextField(labelWithString: "Auswahlmodus:")
+        modeLabel.font = .systemFont(ofSize: 11)
+        modeGroup = NSStackView(views: [modeLabel, modeControl])
+        modeGroup.spacing = 4
+
+        floodPopup.addItems(withTitles: ["Zusammenhängend", "Global"])
+        floodPopup.controlSize = .small
+        floodPopup.target = self; floodPopup.action = #selector(wandChanged)
+        floodPopup.toolTip = "Flutmodus (⇧ beim Klicken kehrt ihn um)"
+        samplePopup.addItems(withTitles: ["Ebene", "Bild"])
+        samplePopup.controlSize = .small
+        samplePopup.target = self; samplePopup.action = #selector(wandChanged)
+        samplePopup.toolTip = "Farben aus der aktiven Ebene oder dem ganzen Bild vergleichen"
+        toleranceSlider.controlSize = .small
+        toleranceSlider.isContinuous = true
+        toleranceSlider.target = self; toleranceSlider.action = #selector(wandChanged)
+        toleranceSlider.widthAnchor.constraint(equalToConstant: 110).isActive = true
+        toleranceLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        toleranceLabel.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        let tolTitle = NSTextField(labelWithString: "Toleranz:"); tolTitle.font = .systemFont(ofSize: 11)
+        let floodTitle = NSTextField(labelWithString: "Flutmodus:"); floodTitle.font = .systemFont(ofSize: 11)
+        let sampleTitle = NSTextField(labelWithString: "Stichprobe:"); sampleTitle.font = .systemFont(ofSize: 11)
+        wandGroup = NSStackView(views: [floodTitle, floodPopup, sampleTitle, samplePopup, tolTitle, toleranceSlider, toleranceLabel])
+        wandGroup.spacing = 4
+
+        finishButton.controlSize = .small
+        finishButton.bezelStyle = .rounded
+        finishButton.target = self; finishButton.action = #selector(finish)
+        finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
+
+        let stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
         stack.orientation = .horizontal
-        stack.spacing = 8
+        stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -268,6 +318,8 @@ final class ToolOptionsBar: NSView {
             stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
+        NotificationCenter.default.addObserver(self, selector: #selector(docChanged), name: .documentChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(docChanged), name: .documentsChanged, object: nil)
         refresh()
     }
 
@@ -278,12 +330,39 @@ final class ToolOptionsBar: NSView {
         AppController.shared.tool = t
     }
 
+    @objc private func modeChanged() {
+        AppController.shared.selectionMode = SelectionMode.allCases[max(0, modeControl.selectedSegment)]
+    }
+
+    @objc private func wandChanged() {
+        let c = AppController.shared
+        c.wandGlobal = floodPopup.indexOfSelectedItem == 1
+        c.wandSampleImage = samplePopup.indexOfSelectedItem == 1
+        c.wandTolerance = toleranceSlider.doubleValue / 100
+        toleranceLabel.stringValue = "\(Int(toleranceSlider.doubleValue.rounded())) %"
+    }
+
+    @objc private func finish() { AppController.shared.finishFloating() }
+
+    @objc private func docChanged() { finishButton.isEnabled = AppController.shared.document?.floating != nil }
+
     func refresh() {
-        let t = AppController.shared.tool
+        let c = AppController.shared
+        let t = c.tool
         if let i = Tool.allCases.firstIndex(of: t) { toolPopup.selectItem(at: i) }
+        modeGroup.isHidden = !t.isSelectionTool
+        wandGroup.isHidden = t != .magicWand
+        finishButton.isHidden = !t.isMoveTool
+        finishButton.isEnabled = c.document?.floating != nil
+        modeControl.selectedSegment = SelectionMode.allCases.firstIndex(of: c.selectionMode) ?? 0
+        floodPopup.selectItem(at: c.wandGlobal ? 1 : 0)
+        samplePopup.selectItem(at: c.wandSampleImage ? 1 : 0)
+        toleranceSlider.doubleValue = c.wandTolerance * 100
+        toleranceLabel.stringValue = "\(Int((c.wandTolerance * 100).rounded())) %"
         switch t {
         case .zoom: optionsLabel.stringValue = "Keine Einstellungen. Tipp: Leertaste gedrückt halten = Hand, ⌘ + Mausrad = Zoom."
         case .pan: optionsLabel.stringValue = "Keine Einstellungen. Mittlere Maustaste verschiebt bei jedem Werkzeug."
+        case .moveSelectedPixels: optionsLabel.stringValue = "Drehen und Skalieren folgen später; Verschieben mit Maus oder Pfeiltasten."
         default: optionsLabel.stringValue = ""
         }
     }

@@ -251,6 +251,8 @@ final class SelfTest {
               && ctrl.document?.layers[0].surface[5, 5] == semi, "\(String(describing: ctrl.document?.layers[0].surface[5, 5]))")
         let pastedDoc = ctrl.document
         _ = perform("edit.pasteNewLayer")
+        check("In neue Ebene einfügen: schwebend", pastedDoc?.floating != nil)
+        ctrl.finishFloating()
         check("In neue Ebene einfügen", pastedDoc?.layers.count == 2 && pastedDoc?.history.last?.name == "In neue Ebene einfügen")
         snapshot(window.contentView, "04-mehrere-bilder")
         if let a = ctrl.active { ctrl.close(a) }
@@ -300,6 +302,135 @@ final class SelfTest {
         check("Werkzeugleiste: Speichern aktiv", states.contains { $0.id == "file.save" && $0.enabled })
 
         try? FileManager.default.removeItem(at: tmp)
+        selectionSteps(main)
+    }
+
+    // MARK: Phase 3 – Auswahl
+
+    private func selectionSteps(_ main: MainWindowController) {
+        typealias M = SelectionInteraction.Modifiers
+        let sel = main.canvas.selection
+        ctrl.newDocument(NewImageParameters(width: 400, height: 300, dpi: 96))
+        pump()
+        guard let d = ctrl.document else { check("Auswahl: Testbild", false); return }
+        func drag(_ tool: Tool, _ a: CGPoint, _ b: CGPoint, _ m: M = M()) {
+            ctrl.tool = tool
+            sel.begin(tool: tool, at: a, modifiers: m)
+            sel.drag(to: CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2), modifiers: m)
+            sel.end(at: b, modifiers: m)
+            pump(0.05)
+        }
+        check("Menü: ohne Auswahl Löschen/Zuschneiden aus", !reg.canPerform("edit.eraseSelection") && !reg.canPerform("image.crop") && !reg.canPerform("edit.deselect"))
+
+        drag(.rectangleSelect, CGPoint(x: 10, y: 10), CGPoint(x: 110, y: 60))
+        check("Rechteckauswahl 100 × 50", d.selectionBounds == PixelRect(x: 10, y: 10, width: 100, height: 50), "\(String(describing: d.selectionBounds))")
+        check("Statusleiste Auswahlgröße", main.statusBar.displayedSelection == "100 × 50 px", main.statusBar.displayedSelection)
+        check("Verlauf „Rechteckauswahl“", d.history.last?.name == "Rechteckauswahl")
+        check("Menü: mit Auswahl Löschen/Zuschneiden an", reg.canPerform("edit.eraseSelection") && reg.canPerform("image.crop") && reg.canPerform("edit.deselect"))
+
+        ctrl.selectionMode = .union
+        check("Werkzeugleiste: Modus Hinzufügen", main.toolOptions.modeControl.selectedSegment == 1)
+        drag(.rectangleSelect, CGPoint(x: 200, y: 100), CGPoint(x: 250, y: 120), M(shift: true))
+        check("Hinzufügen + ⇧ Quadrat", d.state.selection?.selectedPixelCount == 5000 + 2500, "\(d.state.selection?.selectedPixelCount ?? -1)")
+        ctrl.selectionMode = .replace
+        drag(.rectangleSelect, CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 100))
+        drag(.rectangleSelect, CGPoint(x: 50, y: 50), CGPoint(x: 150, y: 150), M(option: true))
+        check("⌥ = Abziehen", d.state.selection?.selectedPixelCount == 10000 - 2500)
+        drag(.rectangleSelect, CGPoint(x: 50, y: 50), CGPoint(x: 150, y: 150), M(option: true, right: true))
+        check("⌥ + Rechtsklick = Schnittmenge", d.state.selection?.isEmpty ?? true)
+        drag(.ellipseSelect, CGPoint(x: 100, y: 50), CGPoint(x: 300, y: 250))
+        check("Ellipsenauswahl", d.selectionBounds == PixelRect(x: 100, y: 50, width: 200, height: 200) && d.history.last?.name == "Ellipsenauswahl")
+        ctrl.tool = .lassoSelect
+        sel.begin(tool: .lassoSelect, at: CGPoint(x: 20, y: 20), modifiers: M())
+        for p in [CGPoint(x: 120, y: 20), CGPoint(x: 120, y: 120)] { sel.drag(to: p, modifiers: M()) }
+        sel.end(at: CGPoint(x: 20, y: 120), modifiers: M())
+        check("Lassoauswahl", d.selectionBounds == PixelRect(x: 20, y: 20, width: 100, height: 100) && d.history.last?.name == "Lassoauswahl",
+              "\(String(describing: d.selectionBounds))")
+        drag(.rectangleSelect, CGPoint(x: 5, y: 5), CGPoint(x: 5, y: 5))
+        check("Klick ohne Aufziehen hebt Auswahl auf", !d.hasSelection)
+
+        // Füllen, Zauberstab, Löschen
+        drag(.rectangleSelect, CGPoint(x: 50, y: 50), CGPoint(x: 90, y: 90))
+        ctrl.colors = ColorState(primary: ColorBgra(r: 220, g: 30, b: 30), secondary: .white)
+        _ = perform("edit.fillSelection")
+        check("Auswahl füllen", d.layers[0].surface[60, 60] == ColorBgra(r: 220, g: 30, b: 30) && d.layers[0].surface[49, 60] == .white && d.hasSelection)
+        _ = perform("edit.deselect")
+        ctrl.tool = .magicWand
+        ctrl.wandTolerance = 0.5; ctrl.wandGlobal = false
+        sel.begin(tool: .magicWand, at: CGPoint(x: 70.5, y: 70.5), modifiers: M())
+        check("Zauberstab", d.selectionBounds == PixelRect(x: 50, y: 50, width: 40, height: 40) && d.history.last?.name == "Zauberstab",
+              "\(String(describing: d.selectionBounds))")
+        check("Werkzeugleiste Zauberstab: Toleranz 50 %", !main.toolOptions.toleranceSlider.isHidden && main.toolOptions.toleranceSlider.doubleValue == 50)
+
+        // Kopieren, Einfügen (schwebend), Verschieben, Fertigstellen
+        _ = perform("edit.copy")
+        let hBefore = d.history.count
+        _ = perform("edit.paste")
+        check("Einfügen: schwebend, Werkzeug Pixel verschieben", d.floating != nil && ctrl.tool == .moveSelectedPixels && d.history.count == hBefore)
+        let o = d.floating?.origin ?? .zero
+        sel.begin(tool: .moveSelectedPixels, at: CGPoint(x: 10, y: 10), modifiers: M())
+        sel.drag(to: CGPoint(x: 210, y: 110), modifiers: M())
+        sel.end(at: CGPoint(x: 210, y: 110), modifiers: M())
+        check("Schwebende Pixel verschoben", d.floating?.origin == PixelPoint(o.x + 200, o.y + 100))
+        snapshot(main.window?.contentView, "09-einfuegen-schwebend")
+        check("Fertigstellen-Knopf aktiv", reg.canPerform("edit.finish"))
+        _ = perform("edit.finish")
+        check("Fertigstellen → ein Verlaufsschritt „Einfügen“", d.floating == nil && d.history.count == hBefore + 1 && d.history.last?.name == "Einfügen")
+        check("Eingefügte Pixel an neuer Stelle", d.layers[0].surface[o.x + 210, o.y + 110] == ColorBgra(r: 220, g: 30, b: 30))
+        check("Auswahl folgt den Pixeln", d.selectionBounds == PixelRect(x: o.x + 200, y: o.y + 100, width: 40, height: 40))
+        _ = perform("edit.undo")
+        check("Rückgängig entfernt Einfügen", d.layers[0].surface[o.x + 210, o.y + 110] == .white)
+
+        // Ausgewählte Pixel verschieben (angehoben) und Auswahl verschieben
+        drag(.rectangleSelect, CGPoint(x: 50, y: 50), CGPoint(x: 90, y: 90))
+        ctrl.tool = .moveSelectedPixels
+        sel.begin(tool: .moveSelectedPixels, at: CGPoint(x: 60, y: 60), modifiers: M())
+        sel.drag(to: CGPoint(x: 260, y: 60), modifiers: M())
+        sel.end(at: CGPoint(x: 260, y: 60), modifiers: M())
+        sel.nudge(dx: 1, dy: 0)
+        ctrl.tool = .moveSelection   // Werkzeugwechsel stellt fertig
+        check("Pixel verschieben + Pfeiltaste, Werkzeugwechsel stellt fertig",
+              d.floating == nil && d.layers[0].surface[251, 50] == ColorBgra(r: 220, g: 30, b: 30) && d.layers[0].surface[60, 60] == .transparent
+              && d.history.last?.name == "Ausgewählte Pixel verschieben")
+        sel.begin(tool: .moveSelection, at: CGPoint(x: 260, y: 60), modifiers: M())
+        sel.drag(to: CGPoint(x: 250, y: 70), modifiers: M())
+        sel.end(at: CGPoint(x: 250, y: 70), modifiers: M())
+        check("Auswahl verschieben (Pixel bleiben)", d.selectionBounds == PixelRect(x: 241, y: 60, width: 40, height: 40)
+              && d.layers[0].surface[251, 50] == ColorBgra(r: 220, g: 30, b: 30) && d.history.last?.name == "Auswahl verschieben")
+
+        // Ausschneiden, Löschen, Umkehren, Alles auswählen, Zuschneiden, Auf Auswahl zoomen
+        _ = perform("edit.cut")
+        check("Ausschneiden", d.layers[0].surface[260, 80] == .transparent && !d.hasSelection && ctrl.pasteboardHasImage)
+        _ = perform("edit.selectAll")
+        check("Alles auswählen", d.state.selection?.selectedPixelCount == 400 * 300)
+        _ = perform("edit.invertSelection")
+        check("Auswahl umkehren", !d.hasSelection)
+        drag(.rectangleSelect, CGPoint(x: 0, y: 0), CGPoint(x: 30, y: 20))
+        _ = perform("edit.eraseSelection")
+        check("Auswahl löschen", d.layers[0].surface[10, 10] == .transparent && !d.hasSelection)
+        drag(.ellipseSelect, CGPoint(x: 100, y: 100), CGPoint(x: 200, y: 160))
+        _ = perform("view.zoomSelection")
+        check("Auf Auswahl zoomen", (ctrl.active?.zoom ?? 0) > 300)
+        _ = perform("image.crop")
+        check("Auf Auswahl zuschneiden", d.size == PixelSize(100, 60) && d.layers[0].surface[0, 0] == .transparent && d.layers[0].surface[50, 30] == .white)
+        _ = perform("edit.undo")
+        check("Zuschneiden rückgängig", d.size == PixelSize(400, 300))
+
+        // Bildschirmfoto: Ameisenlinie und Tönung auf dem Testbild
+        let pattern = Self.testPattern(PixelSize(1200, 800))
+        ctrl.add(Document(state: DocumentState(size: pattern.size, dpi: 96, layers: [Layer(name: "Hintergrund", surface: pattern, isBackground: true)],
+                                               activeLayerIndex: 0), name: "Auswahl", fileURL: nil, historyName: "Bild öffnen", historyKind: .openImage))
+        pump()
+        drag(.ellipseSelect, CGPoint(x: 200, y: 150), CGPoint(x: 700, y: 550))
+        ctrl.selectionMode = .union
+        drag(.rectangleSelect, CGPoint(x: 600, y: 100), CGPoint(x: 1000, y: 400))
+        ctrl.selectionMode = .replace
+        pump(0.3)
+        snapshot(main.window?.contentView, "08-auswahl")
+        let histVC = ctrl.panels.controllers[.history] as? HistoryPanelController
+        histVC?.reload()
+        snapshot(ctrl.panels.panels[.history]?.contentView, "08-verlauf-auswahl")
+        ctrl.tool = .zoom
     }
 
     private func finish(duration: TimeInterval) {

@@ -6,6 +6,8 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
     private let hint = NSTextField(labelWithString: "")
     private let sizeLabel = NSTextField(labelWithString: "")
     private let posLabel = NSTextField(labelWithString: "")
+    private let selLabel = NSTextField(labelWithString: "")
+    private var lastSelection: PixelSize?
     private let unitPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let zoomField = NSTextField(string: "100 %")
     private let quickSize = NSButton()
@@ -26,11 +28,12 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
 
     override init(frame: NSRect) {
         super.init(frame: frame)
-        for l in [hint, sizeLabel, posLabel] { l.font = .systemFont(ofSize: 11); l.lineBreakMode = .byTruncatingTail }
+        for l in [hint, sizeLabel, posLabel, selLabel] { l.font = .systemFont(ofSize: 11); l.lineBreakMode = .byTruncatingTail }
         hint.textColor = .secondaryLabelColor
         hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         sizeLabel.toolTip = "Bildgröße"
         posLabel.toolTip = "Mausposition (von links oben)"
+        selLabel.toolTip = "Größe der Auswahl"
 
         unitPopup.controlSize = .small
         unitPopup.font = .systemFont(ofSize: 11)
@@ -64,13 +67,15 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
 
         let sizeIcon = NSImageView(image: NSImage(systemSymbolName: "photo", accessibilityDescription: "Bildgröße") ?? NSImage())
         let posIcon = NSImageView(image: NSImage(systemSymbolName: "cursorarrow", accessibilityDescription: "Mausposition") ?? NSImage())
-        for i in [sizeIcon, posIcon] { i.contentTintColor = .secondaryLabelColor; i.symbolConfiguration = .init(pointSize: 11, weight: .regular) }
+        let selIcon = NSImageView(image: NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "Auswahlgröße") ?? NSImage())
+        for i in [sizeIcon, posIcon, selIcon] { i.contentTintColor = .secondaryLabelColor; i.symbolConfiguration = .init(pointSize: 11, weight: .regular) }
 
-        let right = NSStackView(views: [sizeIcon, sizeLabel, posIcon, posLabel, unitPopup, zoomField, quickSize, zoomOutButton, zoomSlider, zoomInButton])
+        let right = NSStackView(views: [sizeIcon, sizeLabel, posIcon, posLabel, selIcon, selLabel, unitPopup, zoomField, quickSize, zoomOutButton, zoomSlider, zoomInButton])
         right.orientation = .horizontal
         right.spacing = 6
         right.setCustomSpacing(16, after: sizeLabel)
         right.setCustomSpacing(16, after: posLabel)
+        right.setCustomSpacing(16, after: selLabel)
         right.setCustomSpacing(14, after: unitPopup)
         for v in [hint, right] as [NSView] { v.translatesAutoresizingMaskIntoConstraints = false; addSubview(v) }
         NSLayoutConstraint.activate([
@@ -81,6 +86,7 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
             right.leadingAnchor.constraint(greaterThanOrEqualTo: hint.trailingAnchor, constant: 12),
             sizeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 90),
             posLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
+            selLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             zoomField.widthAnchor.constraint(equalToConstant: 64),
             zoomSlider.widthAnchor.constraint(equalToConstant: 120),
         ])
@@ -114,7 +120,18 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
             zoomField.stringValue = ""
         }
         setPointer(lastPointer)
+        setSelectionSize(ctrl.document?.floating?.rect.size ?? ctrl.document?.selectionBounds?.size)
     }
+
+    func setSelectionSize(_ s: PixelSize?) {
+        lastSelection = s
+        let ctrl = AppController.shared
+        guard let s, let d = ctrl.document else { selLabel.stringValue = "–"; return }
+        let u = ctrl.unit
+        selLabel.stringValue = "\(format(s.width, dpi: d.state.dpi, unit: u)) × \(format(s.height, dpi: d.state.dpi, unit: u)) \(u.shortName)"
+    }
+
+    var displayedSelection: String { selLabel.stringValue }
 
     func setPointer(_ p: PixelPoint?) {
         lastPointer = p

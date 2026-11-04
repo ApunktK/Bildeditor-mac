@@ -82,21 +82,33 @@ enum Tool: String, CaseIterable {
 
     var plannedPhase: Int? {
         switch self {
-        case .zoom, .pan: return nil
+        case .zoom, .pan, .rectangleSelect, .lassoSelect, .ellipseSelect, .magicWand, .moveSelectedPixels, .moveSelection: return nil
         default: return 4
         }
     }
 
     var isImplemented: Bool { plannedPhase == nil }
 
+    var isSelectionTool: Bool { self == .rectangleSelect || self == .lassoSelect || self == .ellipseSelect || self == .magicWand }
+    var isMoveTool: Bool { self == .moveSelectedPixels || self == .moveSelection }
+
     /// Hinweis in der Statusleiste (eigener Text).
     var statusHint: String {
         switch self {
         case .zoom: return "Klicken: vergrößern · Rechtsklick oder ⌥-Klick: verkleinern · Rahmen ziehen: auf Bereich zoomen"
         case .pan: return "Ziehen, um die Ansicht zu verschieben"
+        case .rectangleSelect: return "Rechteck aufziehen · ⇧ Quadrat · ⌘ hinzufügen · ⌥ abziehen · Rechtsklick+⌘ umkehren · Rechtsklick+⌥ Schnittmenge"
+        case .ellipseSelect: return "Ellipse aufziehen · ⇧ Kreis · ⌘ hinzufügen · ⌥ abziehen"
+        case .lassoSelect: return "Freihand umfahren; die Form wird zum Startpunkt geschlossen · ⌘ hinzufügen · ⌥ abziehen"
+        case .magicWand: return "Klicken wählt ähnliche Farben · ⇧ global · ⌘ hinzufügen · ⌥ abziehen"
+        case .moveSelectedPixels: return "Ziehen verschiebt die ausgewählten Pixel · ⌘ Kopie · Pfeiltasten 1 px (⌘ 10 px) · Eingabetaste: fertigstellen"
+        case .moveSelection: return "Ziehen verschiebt nur die Auswahlkontur · Pfeiltasten 1 px (⌘ 10 px)"
         default: return "\(title): noch nicht verfügbar (geplant für Phase \(plannedPhase ?? 0))"
         }
     }
+
+    /// Verlaufsname für eine mit diesem Werkzeug erzeugte Auswahl.
+    var historyName: String { title }
 
     var image: NSImage? {
         NSImage(systemSymbolName: symbolName, accessibilityDescription: title)

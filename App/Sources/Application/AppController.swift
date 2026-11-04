@@ -35,7 +35,32 @@ final class AppController: NSObject {
     var isSelfTest = false
 
     var tool: Tool = .zoom {
-        didSet { if tool != oldValue { NotificationCenter.default.post(name: .toolChanged, object: nil) } }
+        didSet {
+            guard tool != oldValue else { return }
+            // Werkzeugwechsel stellt schwebende Pixel fertig (Referenz: Fertigstellen)
+            document?.settlePreview()
+            NotificationCenter.default.post(name: .toolChanged, object: nil)
+        }
+    }
+
+    // Einstellungen der Auswahlwerkzeuge (Werkzeugleiste, Zeile 2)
+    var selectionMode: SelectionMode {
+        get { SelectionMode(rawValue: UserDefaults.standard.string(forKey: "Auswahl.Modus") ?? "") ?? .replace }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "Auswahl.Modus"); NotificationCenter.default.post(name: .toolChanged, object: nil) }
+    }
+    /// Toleranz 0…1; Referenz-Screenshot zeigt 50 % (Werkseinstellung ungeklärt, R-1).
+    var wandTolerance: Double {
+        get { UserDefaults.standard.object(forKey: "Zauberstab.Toleranz") as? Double ?? 0.5 }
+        set { UserDefaults.standard.set(min(1, max(0, newValue)), forKey: "Zauberstab.Toleranz") }
+    }
+    var wandGlobal: Bool {
+        get { UserDefaults.standard.bool(forKey: "Zauberstab.Global") }
+        set { UserDefaults.standard.set(newValue, forKey: "Zauberstab.Global") }
+    }
+    /// Stichprobe aus dem ganzen Bild statt der aktiven Ebene.
+    var wandSampleImage: Bool {
+        get { UserDefaults.standard.bool(forKey: "Zauberstab.Bild") }
+        set { UserDefaults.standard.set(newValue, forKey: "Zauberstab.Bild") }
     }
 
     var colors = ColorState(primary: Settings.shared.primaryColor, secondary: Settings.shared.secondaryColor) {
@@ -84,6 +109,7 @@ final class AppController: NSObject {
 
     func activate(_ s: DocumentSession?) {
         guard s !== active else { return }
+        active?.document.settlePreview()
         mainWindow?.rememberViewState()
         active = s
         NotificationCenter.default.post(name: .documentsChanged, object: nil)
@@ -180,6 +206,7 @@ final class AppController: NSObject {
     @discardableResult
     func write(_ s: DocumentSession, to url: URL, format: SaveFormat, quality: Int, confirmFlatten: Bool) -> Bool {
         let doc = s.document
+        doc.settlePreview()
         if confirmFlatten && doc.layers.count > 1 && !isSelfTest {
             let a = NSAlert()
             a.messageText = "Ebenen zusammenfügen?"
@@ -212,6 +239,7 @@ final class AppController: NSObject {
     /// Schließt ein Bild mit Rückfrage bei ungespeicherten Änderungen. Rückgabe: geschlossen.
     @discardableResult
     func close(_ s: DocumentSession) -> Bool {
+        s.document.settlePreview()
         if s.document.needsSavePrompt && !isSelfTest {
             activate(s)
             switch askToSave(s) {
@@ -327,10 +355,34 @@ final class AppController: NSObject {
         doc.insertLayer(surface: surf, name: name, growCanvas: grow, historyName: historyName, kind: kind)
     }
 
-    func pasteIntoNewLayer() {
+    /// Einfügen als schwebende Pixel (aktive oder neue Ebene); Werkzeug wechselt zu „Ausgewählte Pixel verschieben“.
+    func pasteFloating(intoNewLayer: Bool) {
         guard let doc = document, let surf = imageFromPasteboard() else { NSSound.beep(); return }
-        insertAsLayer(surf, name: doc.nextLayerName(), historyName: "In neue Ebene einfügen", kind: .paste)
+        var grow = false
+        if (surf.width > doc.size.width || surf.height > doc.size.height) && !isSelfTest {
+            let a = NSAlert()
+            a.messageText = "Das eingefügte Bild ist größer als die Leinwand."
+            a.informativeText = "Bild \(surf.width) × \(surf.height) Pixel, Leinwand \(doc.size.width) × \(doc.size.height) Pixel. Soll die Leinwand vergrößert werden?"
+            a.addButton(withTitle: "Leinwand vergrößern")
+            a.addButton(withTitle: "Abbrechen")
+            a.addButton(withTitle: "Leinwandgröße beibehalten")
+            switch a.runModal() {
+            case .alertFirstButtonReturn: grow = true
+            case .alertThirdButtonReturn: grow = false
+            default: return
+            }
+        } else if isSelfTest { grow = surf.width > doc.size.width || surf.height > doc.size.height }
+        doc.settlePreview()
+        // Referenz: links oben in der sichtbaren Fläche (bzw. in der Bildecke, wenn sie sichtbar ist)
+        let origin = grow ? PixelPoint.zero : (mainWindow?.canvas.visibleTopLeftPixel ?? .zero)
+        tool = .moveSelectedPixels
+        doc.beginFloating(doc.floatingPaste(surf, at: origin, intoNewLayer: intoNewLayer, growCanvas: grow))
     }
+
+    /// Schwebende Pixel fertigstellen (Eingabetaste, „Fertigstellen“).
+    func finishFloating() { document?.commitFloating() }
+
+    func pasteIntoNewLayer() { pasteFloating(intoNewLayer: true) }
 
     func importLayerFromFile() {
         guard document != nil else { return }

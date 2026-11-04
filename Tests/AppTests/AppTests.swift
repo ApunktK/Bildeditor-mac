@@ -84,3 +84,30 @@ final class AppTests: XCTestCase {
         XCTAssertFalse(ctrl.handleSingleKey("q", shift: false))
     }
 }
+
+final class SelectionToolTests: XCTestCase {
+    typealias M = SelectionInteraction.Modifiers
+    func testModeFromModifiers() {
+        XCTAssertEqual(SelectionInteraction.mode(base: .replace, M()), .replace)
+        XCTAssertEqual(SelectionInteraction.mode(base: .intersect, M()), .intersect)
+        XCTAssertEqual(SelectionInteraction.mode(base: .replace, M(command: true)), .union)
+        XCTAssertEqual(SelectionInteraction.mode(base: .replace, M(option: true)), .exclude)
+        XCTAssertEqual(SelectionInteraction.mode(base: .replace, M(command: true, right: true)), .xor)
+        XCTAssertEqual(SelectionInteraction.mode(base: .replace, M(option: true, right: true)), .intersect)
+    }
+
+    func testSnappedRect() {
+        XCTAssertEqual(SelectionInteraction.snappedRect(from: CGPoint(x: 10.4, y: 20.6), to: CGPoint(x: 5.2, y: 30.1), square: false),
+                       CGRect(x: 5, y: 21, width: 5, height: 9))
+        XCTAssertEqual(SelectionInteraction.snappedRect(from: CGPoint(x: 0, y: 0), to: CGPoint(x: 30, y: -10), square: true),
+                       CGRect(x: 0, y: -30, width: 30, height: 30))
+    }
+
+    func testOutlineGraphics() {
+        let m = SelectionMask.rectangle(PixelRect(x: 2, y: 3, width: 10, height: 4), in: PixelSize(20, 20))
+        let g = SelectionRendering.graphics(for: m)
+        XCTAssertEqual(g?.bounds, PixelRect(x: 2, y: 3, width: 10, height: 4))
+        XCTAssertEqual(g?.path.boundingBox, CGRect(x: 2, y: 3, width: 10, height: 4))
+        XCTAssertNotNil(g?.tint)
+    }
+}

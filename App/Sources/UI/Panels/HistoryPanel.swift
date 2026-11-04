@@ -100,6 +100,12 @@ final class HistoryPanelController: NSViewController, NSTableViewDataSource, NST
         case .flatten: return "square.stack.3d.down.right"
         case .paste: return "doc.on.clipboard"
         case .edit: return "pencil"
+        case .selection: return "rectangle.dashed"
+        case .selectionMove: return "arrow.up.and.down.and.arrow.left.and.right"
+        case .pixelsMove: return "move.3d"
+        case .erase: return "eraser"
+        case .fill: return "drop.fill"
+        case .crop: return "crop"
         }
     }
 

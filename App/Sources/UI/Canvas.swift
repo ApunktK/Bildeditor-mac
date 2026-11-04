@@ -53,6 +53,20 @@ final class CanvasView: NSView {
             ctx.restoreGState()
         }
 
+        // Schwebende Pixel (Einfügen/Verschieben) über dem Bild
+        if let f = s.document.floating, let fg = s.floatingGraphics, let img = fg.image {
+            let sc = c.scale
+            let r = CGRect(x: ir.minX + CGFloat(f.origin.x) * sc, y: ir.minY + CGFloat(f.origin.y) * sc,
+                           width: CGFloat(f.pixels.width) * sc, height: CGFloat(f.pixels.height) * sc)
+            ctx.saveGState()
+            ctx.clip(to: ir.intersection(dirtyRect))
+            ctx.interpolationQuality = s.zoom >= 100 ? .none : .high
+            ctx.translateBy(x: r.minX, y: r.maxY)
+            ctx.scaleBy(x: 1, y: -1)
+            ctx.draw(img, in: CGRect(x: 0, y: 0, width: r.width, height: r.height))
+            ctx.restoreGState()
+        }
+
         // Pixelraster ab 200 % (Referenz: unter 200 % nicht sichtbar)
         if AppController.shared.showPixelGrid && s.zoom >= 200 {
             let sc = c.scale
@@ -74,7 +88,34 @@ final class CanvasView: NSView {
             NSColor(white: 0.45, alpha: 0.55).setStroke()
             path.stroke()
         }
+        drawSelectionOverlays(ctx, session: s, controller: c, imageRect: ir)
         drawRubberBand()
+    }
+
+    /// Tönung, Ameisenlinie und Vorschauform der Auswahlwerkzeuge.
+    private func drawSelectionOverlays(_ ctx: CGContext, session s: DocumentSession, controller c: CanvasController, imageRect ir: NSRect) {
+        let sc = c.scale
+        let tool = AppController.shared.tool
+        let phase = c.antsPhase
+        if let f = s.document.floating, let fg = s.floatingGraphics {
+            let off = CGPoint(x: f.origin.x, y: f.origin.y)
+            if tool.isSelectionTool || tool.isMoveTool { SelectionRendering.drawTint(fg.outline, offset: off, in: ctx, origin: ir.origin, scale: sc) }
+            SelectionRendering.drawOutline(fg.outline, offset: off, in: ctx, origin: ir.origin, scale: sc, phase: phase)
+        } else if let g = s.selectionGraphics {
+            let off = c.selection.selectionOffset ?? .zero
+            if tool.isSelectionTool || tool == .moveSelection { SelectionRendering.drawTint(g, offset: off, in: ctx, origin: ir.origin, scale: sc) }
+            SelectionRendering.drawOutline(g, offset: off, in: ctx, origin: ir.origin, scale: sc, phase: phase)
+        }
+        if let p = c.selection.dragPath {
+            ctx.saveGState()
+            ctx.translateBy(x: ir.minX, y: ir.minY)
+            ctx.scaleBy(x: sc, y: sc)
+            let w = 1 / sc
+            ctx.setLineWidth(w)
+            ctx.addPath(p); ctx.setStrokeColor(NSColor.white.cgColor); ctx.strokePath()
+            ctx.addPath(p); ctx.setLineDash(phase: phase * w, lengths: [4 * w, 4 * w]); ctx.setStrokeColor(NSColor.black.cgColor); ctx.strokePath()
+            ctx.restoreGState()
+        }
     }
 
     private func drawRubberBand() {
@@ -141,6 +182,11 @@ final class CanvasController: NSObject {
 
     let scrollView = DropScrollView()
     let canvasView = CanvasView()
+    let selection = SelectionInteraction()
+    /// Phase der Ameisenlinie (läuft über einen Zeitgeber).
+    private(set) var antsPhase: CGFloat = 0
+    private var antsTimer: Timer?
+    var onSelectionInfo: ((PixelSize?) -> Void)?
     var onPointerMoved: ((PixelPoint?) -> Void)?
     var onZoomChanged: (() -> Void)?
 
@@ -160,7 +206,28 @@ final class CanvasController: NSObject {
         scrollView.borderType = .noBorder
         scrollView.allowsMagnification = false
         clip.postsFrameChangedNotifications = true
+        selection.onChange = { [weak self] in
+            guard let self else { return }
+            self.canvasView.needsDisplay = true
+            self.onSelectionInfo?(self.selection.displayedSize)
+        }
+        antsTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in self?.tickAnts() }
         NotificationCenter.default.addObserver(self, selector: #selector(clipResized), name: NSView.frameDidChangeNotification, object: clip)
+    }
+
+    private func tickAnts() {
+        guard let s = session, s.document.state.selection != nil || s.document.floating != nil || selection.dragPath != nil else { return }
+        antsPhase = (antsPhase + 1).truncatingRemainder(dividingBy: 8)
+        canvasView.needsDisplay = true
+    }
+
+    /// Linke obere sichtbare Bildecke (Einfügeposition der Referenz), innerhalb des Bildes.
+    var visibleTopLeftPixel: PixelPoint {
+        guard let s = session else { return .zero }
+        let v = clip.bounds
+        let p = imagePoint(fromView: v.origin)
+        let x = max(0, min(s.document.size.width - 1, Int(ceil(p.x)))), y = max(0, min(s.document.size.height - 1, Int(ceil(p.y))))
+        return PixelPoint(x, y)
     }
 
     // MARK: Geometrie
@@ -287,8 +354,9 @@ final class CanvasController: NSObject {
             let c = visibleCenterInImage
             layoutCanvas()
             center(onImage: c)
-        case .content, .layers:
+        case .content, .layers, .selection, .floating:
             canvasView.needsDisplay = true
+            onSelectionInfo?(selection.displayedSize)
         default: break
         }
     }
@@ -305,6 +373,8 @@ final class CanvasController: NSObject {
         switch effectiveTool {
         case .pan: return .openHand
         case .zoom: return Self.zoomCursor
+        case .rectangleSelect, .ellipseSelect, .lassoSelect, .magicWand: return .crosshair
+        case .moveSelectedPixels, .moveSelection: return Self.moveCursor
         default: return .arrow
         }
     }
@@ -316,7 +386,15 @@ final class CanvasController: NSObject {
         return NSCursor(image: img, hotSpot: NSPoint(x: img.size.width * 0.4, y: img.size.height * 0.4))
     }()
 
-    func toolChanged() { canvasView.window?.invalidateCursorRects(for: canvasView) }
+    static let moveCursor: NSCursor = {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .medium)
+        guard let img = NSImage(systemSymbolName: "arrow.up.and.down.and.arrow.left.and.right", accessibilityDescription: "Verschieben")?
+            .withSymbolConfiguration(cfg) else { return .openHand }
+        return NSCursor(image: img, hotSpot: NSPoint(x: img.size.width / 2, y: img.size.height / 2))
+    }()
+
+    func toolChanged() {
+        selection.cancelDrag() canvasView.window?.invalidateCursorRects(for: canvasView) }
 
     func pointerMoved(_ e: NSEvent) {
         guard session != nil else { onPointerMoved?(nil); return }
@@ -328,12 +406,25 @@ final class CanvasController: NSObject {
     func mouseDown(_ e: NSEvent, button: Button) {
         guard session != nil else { return }
         let tool: Tool = button == .middle ? .pan : effectiveTool
+        if tool.isSelectionTool || tool.isMoveTool {
+            selectionToolActive = true
+            selection.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)),
+                            modifiers: .init(e, right: button == .right))
+            return
+        }
         guard tool == .zoom || tool == .pan else { NSSound.beep(); return }
         activeDrag = (tool, button, e.locationInWindow, clip.bounds.origin, canvasView.convert(e.locationInWindow, from: nil))
         if tool == .pan { canvasView.window?.invalidateCursorRects(for: canvasView); NSCursor.closedHand.set() }
     }
 
+    private var selectionToolActive = false
+
     func mouseDragged(_ e: NSEvent) {
+        if selectionToolActive {
+            onPointerMoved?(pixel(at: e))
+            selection.drag(to: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), modifiers: .init(e, right: false))
+            return
+        }
         guard let d = activeDrag else { return }
         onPointerMoved?(pixel(at: e))
         switch d.tool {
@@ -349,6 +440,11 @@ final class CanvasController: NSObject {
     }
 
     func mouseUp(_ e: NSEvent) {
+        if selectionToolActive {
+            selectionToolActive = false
+            selection.end(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), modifiers: .init(e, right: false))
+            return
+        }
         guard let d = activeDrag else { return }
         activeDrag = nil
         if d.tool == .zoom {
@@ -389,6 +485,22 @@ final class CanvasController: NSObject {
         if e.charactersIgnoringModifiers == " " && mods.isEmpty {
             if !e.isARepeat { spaceDown = true; canvasView.window?.invalidateCursorRects(for: canvasView) }
             return true
+        }
+        let ctrl = AppController.shared
+        switch Int(e.keyCode) {
+        case 36, 76, 53:   // Eingabe, Enter, Esc: Fertigstellen (Referenz)
+            if ctrl.document?.floating != nil { ctrl.finishFloating(); return true }
+            if e.keyCode == 53 && selection.isActive { selection.cancelDrag(); return true }
+        case 51, 117:      // ⌫ / ⌦: Auswahl löschen, ⌥⌫: Auswahl füllen
+            if mods.isEmpty { ctrl.commands.perform("edit.eraseSelection"); return true }
+            if mods == [.option] { ctrl.commands.perform("edit.fillSelection"); return true }
+        case 123...126:
+            guard ctrl.tool.isMoveTool && (mods.isEmpty || mods == [.command]) else { break }
+            let step = mods.contains(.command) ? 10 : 1
+            let d: (Int, Int) = e.keyCode == 123 ? (-step, 0) : e.keyCode == 124 ? (step, 0) : e.keyCode == 125 ? (0, step) : (0, -step)
+            selection.nudge(dx: d.0, dy: d.1)
+            return true
+        default: break
         }
         // Cmd+1 … Cmd+9: zum Bild Nummer X wechseln
         if mods == [.command], let ch = e.charactersIgnoringModifiers?.first, let n = ch.wholeNumberValue, n >= 1 {

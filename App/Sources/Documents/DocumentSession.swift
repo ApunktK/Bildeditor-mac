@@ -33,7 +33,8 @@ final class DocumentSession {
         token = document.observe { [weak self] change in
             guard let self else { return }
             switch change {
-            case .content, .layers, .size: self.cachedComposite = nil; self.cachedThumbnail = nil
+            case .content, .layers, .size: self.cachedComposite = nil; self.cachedThumbnail = nil; self.cachedOutline = nil
+            case .selection: self.cachedOutline = nil
             default: break
             }
             NotificationCenter.default.post(name: .documentChanged, object: self, userInfo: ["change": change])
@@ -48,6 +49,41 @@ final class DocumentSession {
     var composite: CGImage? {
         if cachedComposite == nil { cachedComposite = ImageRendering.composite(document.state) }
         return cachedComposite
+    }
+
+    // MARK: Auswahl-Anzeige
+
+    struct SelectionGraphics {
+        /// Kontur in Bildkoordinaten (Pixelkanten).
+        let path: CGPath
+        /// Maske der Auswahl im Begrenzungsrechteck (für die blaue Tönung).
+        let tint: CGImage?
+        let bounds: PixelRect
+    }
+
+    private var cachedOutline: SelectionGraphics??
+    private var cachedFloatingKey: TiledSurface?
+    private var cachedFloating: (image: CGImage?, outline: SelectionGraphics)?
+
+    /// Kontur und Tönung der aktuellen Auswahl (nil ohne Auswahl).
+    var selectionGraphics: SelectionGraphics? {
+        if let c = cachedOutline { return c }
+        let g = document.state.selection.flatMap { SelectionRendering.graphics(for: $0) }
+        cachedOutline = .some(g)
+        return g
+    }
+
+    /// Bild und Kontur der schwebenden Pixel (Kontur relativ zur linken oberen Ecke des Stücks).
+    var floatingGraphics: (image: CGImage?, outline: SelectionGraphics)? {
+        guard let f = document.floating else { cachedFloating = nil; cachedFloatingKey = nil; return nil }
+        if let c = cachedFloating, cachedFloatingKey == f.pixels { return c }
+        guard let outline = SelectionRendering.graphics(for: f.shape) else { return nil }
+        var bytes = f.pixels.bgraBytes()
+        Compositor.premultiplyInPlace(&bytes)
+        let img = ImageRendering.cgImage(premultipliedBGRA: bytes, width: f.pixels.width, height: f.pixels.height)
+        cachedFloating = (img, outline)
+        cachedFloatingKey = f.pixels
+        return cachedFloating
     }
 
     var thumbnail: NSImage {

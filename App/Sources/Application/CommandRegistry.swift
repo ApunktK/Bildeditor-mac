@@ -58,9 +58,14 @@ final class CommandRegistry: NSObject, NSMenuItemValidation {
 
     func canPerform(_ id: String) -> Bool { byID[id]?.canRun ?? false }
 
+    /// Befehle, die schwebende Pixel nicht fertigstellen (reine Ansicht/Fenster/Hilfe).
+    static let keepsFloating = ["view.zoom", "view.actualSize", "view.pixelGrid", "view.unit", "window.", "help.", "app.", "edit.finish"]
+
     @discardableResult
     func perform(_ id: String) -> Bool {
         guard let c = byID[id], c.canRun, let run = c.run else { NSSound.beep(); return false }
+        // Schwebende Pixel vor anderen Befehlen fertigstellen (Referenz: Befehl = Fertigstellen).
+        if !Self.keepsFloating.contains(where: { id.hasPrefix($0) }) { AppController.shared.document?.settlePreview() }
         run()
         return true
     }

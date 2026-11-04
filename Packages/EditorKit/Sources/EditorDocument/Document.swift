@@ -9,16 +9,19 @@ public struct DocumentState: Equatable, Sendable {
     /// Ebenen von unten (Index 0) nach oben.
     public var layers: [Layer]
     public var activeLayerIndex: Int
+    /// Aktuelle Auswahl; nil = keine Auswahl (Bearbeitungen wirken dann auf die ganze Ebene).
+    public var selection: SelectionMask?
 
-    public init(size: PixelSize, dpi: Double, layers: [Layer], activeLayerIndex: Int) {
-        self.size = size; self.dpi = dpi; self.layers = layers; self.activeLayerIndex = activeLayerIndex
+    public init(size: PixelSize, dpi: Double, layers: [Layer], activeLayerIndex: Int, selection: SelectionMask? = nil) {
+        self.size = size; self.dpi = dpi; self.layers = layers; self.activeLayerIndex = activeLayerIndex; self.selection = selection
     }
 }
 
 /// Art eines Verlaufseintrags (bestimmt das Symbol im Verlaufsfenster).
 public enum HistoryKind: String, Sendable {
     case newImage, openImage, layerAdd, layerDelete, layerDuplicate, layerMerge, layerMove, layerProperties,
-         imageTransform, imageResize, flatten, paste, edit
+         imageTransform, imageResize, flatten, paste, edit,
+         selection, selectionMove, pixelsMove, erase, fill, crop
 }
 
 public struct HistoryEntry: Sendable {
@@ -30,7 +33,7 @@ public struct HistoryEntry: Sendable {
 /// Ein geöffnetes Bild mit eigenem Verlauf. Alle Änderungen laufen über Methoden dieser Klasse,
 /// damit jede abgeschlossene Aktion genau einen Verlaufseintrag erzeugt.
 public final class Document {
-    public enum Change: Sendable { case content, layers, activeLayer, history, size, file }
+    public enum Change: Sendable { case content, layers, activeLayer, history, size, file, selection, floating }
 
     public let id = UUID()
     public private(set) var state: DocumentState
@@ -91,31 +94,39 @@ public final class Document {
     public func removeObserver(_ token: UUID) { observers[token] = nil }
     private func notify(_ c: Change) { for h in observers.values { h(c) } }
 
+    /// Neuen angezeigten Zustand setzen und nur die tatsächlich geänderten Teile melden.
+    private func display(_ new: DocumentState) {
+        let old = state
+        state = new
+        if old.size != new.size { notify(.size) }
+        if old.layers != new.layers { notify(.layers); notify(.content) }
+        if old.activeLayerIndex != new.activeLayerIndex { notify(.activeLayer) }
+        if old.selection != new.selection { notify(.selection) }
+    }
+
     // MARK: Verlauf
 
     /// Übernimmt einen neuen Zustand als Verlaufseintrag (verwirft rückgängig gemachte Einträge).
     public func commit(_ newState: DocumentState, name: String, kind: HistoryKind) {
-        let sizeChanged = newState.size != state.size
+        if previewBase != nil { settlePreview() }
         history.removeSubrange((historyIndex + 1)...)
         if let s = savedHistoryIndex, s > historyIndex { savedHistoryIndex = nil }
         history.append(HistoryEntry(name: name, kind: kind, state: newState))
         historyIndex = history.count - 1
-        state = newState
-        if sizeChanged { notify(.size) }
-        notify(.layers); notify(.content); notify(.history)
+        display(newState)
+        notify(.history)
     }
 
-    public func undo() { if canUndo { jump(to: historyIndex - 1) } }
-    public func redo() { if canRedo { jump(to: historyIndex + 1) } }
+    public func undo() { settlePreview(); if canUndo { jump(to: historyIndex - 1) } }
+    public func redo() { settlePreview(); if canRedo { jump(to: historyIndex + 1) } }
 
     /// Sprung zu einem Verlaufseintrag (Klick im Verlaufsfenster).
     public func jump(to index: Int) {
+        settlePreview()
         guard index >= 0, index < history.count, index != historyIndex else { return }
-        let old = state.size
         historyIndex = index
-        state = history[index].state
-        if old != state.size { notify(.size) }
-        notify(.layers); notify(.content); notify(.history)
+        display(history[index].state)
+        notify(.history)
     }
 
     public func markSaved(as url: URL?) {
@@ -127,6 +138,7 @@ public final class Document {
     // MARK: Ebenen (ohne Verlauf)
 
     public func setActiveLayer(_ index: Int) {
+        settlePreview()
         guard index >= 0, index < state.layers.count, index != state.activeLayerIndex else { return }
         state.activeLayerIndex = index
         // Auswahl der aktiven Ebene ist kein Verlaufsschritt; der Zustand im aktuellen Eintrag wird mitgeführt.
@@ -253,22 +265,88 @@ public final class Document {
     // ein Verlaufsschritt. Abbrechen stellt den Ausgangszustand wieder her.
     private var previewBase: DocumentState?
     public var isPreviewing: Bool { previewBase != nil }
+    /// Letzter Zustand im Verlauf (ohne laufende Vorschau).
+    public var committedState: DocumentState { previewBase ?? state }
+
+    /// Schwebende Pixel (Einfügen, „Ausgewählte Pixel verschieben“) bis zum Fertigstellen.
+    public private(set) var floating: FloatingPixels?
+
+    /// Zeigt einen Zustand an, ohne einen Verlaufsschritt anzulegen.
+    public func preview(_ s: DocumentState) {
+        if previewBase == nil { previewBase = state }
+        display(s)
+    }
+
+    /// Beendet eine Vorschau: mit Namen als ein Verlaufsschritt übernehmen, ohne Namen verwerfen.
+    public func endPreview(commitAs name: String?, kind: HistoryKind = .edit) {
+        guard let base = previewBase else { return }
+        let final = floating?.composed() ?? state
+        let hadFloating = floating != nil
+        previewBase = nil
+        floating = nil
+        if hadFloating { notify(.floating) }
+        if let name, final != base {
+            commit(final, name: name, kind: kind)
+        } else {
+            display(base)
+        }
+    }
+
+    /// Offene Vorschau abschließen: schwebende Pixel werden übernommen, sonstige Vorschauen verworfen.
+    public func settlePreview() {
+        guard previewBase != nil else { return }
+        if let f = floating { endPreview(commitAs: f.historyName, kind: f.kind) } else { endPreview(commitAs: nil) }
+    }
+
+    /// Schwebende Pixel beginnen. Angezeigt wird `base`; das Stück selbst zeichnet die Oberfläche darüber
+    /// (`floating`), damit Verschieben ohne Neuberechnung des ganzen Bildes flüssig bleibt.
+    public func beginFloating(_ f: FloatingPixels) {
+        settlePreview()
+        floating = f
+        preview(f.base)
+        notify(.floating)
+    }
+
+    public func moveFloating(to origin: PixelPoint) {
+        guard var f = floating, f.origin != origin else { return }
+        f.origin = origin
+        floating = f
+        notify(.floating)
+    }
+
+    /// Fertigstellen: Stück einmischen, ein Verlaufsschritt.
+    public func commitFloating() {
+        guard let f = floating else { return }
+        endPreview(commitAs: f.historyName, kind: f.kind)
+    }
+
+    /// Verwerfen (z. B. Abbrechen): Zustand vor dem Anheben/Einfügen.
+    public func cancelFloating() {
+        guard floating != nil else { return }
+        endPreview(commitAs: nil)
+    }
 
     public func previewLayerProperties(_ props: Layer.Properties, at index: Int) {
         guard index >= 0, index < state.layers.count else { return }
+        if floating != nil { settlePreview() }
         if previewBase == nil { previewBase = state }
-        state.layers[index].properties = props
-        notify(.layers); notify(.content)
+        var s = state
+        s.layers[index].properties = props
+        display(s)
     }
 
     /// Beendet die Vorschau: `apply` übernimmt die Werte als einen Verlaufsschritt, sonst Rückkehr zum Ausgangszustand.
     public func endLayerPropertiesPreview(apply: Bool, at index: Int) {
-        guard let base = previewBase else { return }
+        guard let base = previewBase, floating == nil else { return }
         let props = state.layers[index].properties
         previewBase = nil
-        state = base
-        if apply && base.layers[index].properties != props { setLayerProperties(props, at: index) }
-        else { notify(.layers); notify(.content) }
+        if apply && base.layers[index].properties != props {
+            var s = base
+            s.layers[index].properties = props
+            commit(s, name: "Ebeneneigenschaften", kind: .layerProperties)
+        } else {
+            display(base)
+        }
     }
 
     public func toggleVisibility(at index: Int) {
@@ -296,6 +374,15 @@ public final class Document {
     public func transformImage(_ t: ImageTransform) {
         var s = state
         for i in s.layers.indices { s.layers[i].surface = Self.apply(t, s.layers[i].surface) }
+        if let sel = s.selection {
+            switch t {
+            case .flipHorizontal: s.selection = sel.flippedHorizontally()
+            case .flipVertical: s.selection = sel.flippedVertically()
+            case .rotate90CW: s.selection = sel.rotated90Clockwise()
+            case .rotate90CCW: s.selection = sel.rotated90CounterClockwise()
+            case .rotate180: s.selection = sel.rotated180()
+            }
+        }
         if t == .rotate90CW || t == .rotate90CCW { s.size = PixelSize(s.size.height, s.size.width) }
         commit(s, name: Self.name(t, layer: false), kind: .imageTransform)
     }
@@ -341,6 +428,7 @@ public final class Document {
                 s.layers[i].surface = s.layers[i].surface.resizedCanvas(to: ns, offset: .zero, fill: fill)
             }
             s.size = ns
+            s.selection = s.selection?.resizedCanvas(to: ns, offset: .zero)
         }
         var target = TiledSurface(size: s.size)
         target.copy(from: surface, sourceRect: surface.bounds, to: .zero)
