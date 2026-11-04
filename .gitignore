@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+build/
+build-test/
+DerivedData/
+*.xcodeproj/
+xcuserdata/
+Packages/EditorKit/.swiftpm/

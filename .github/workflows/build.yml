@@ -1,0 +1,73 @@
+name: macOS-Build
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode-Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app 2>/dev/null || true
+          xcodebuild -version
+          sw_vers
+
+      - name: Kern-Tests (EditorKit)
+        working-directory: Packages/EditorKit
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/editorkit-tests.log"
+
+      - name: Projekt erzeugen
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Release-Build (Universal)
+        run: |
+          set -o pipefail
+          xcodebuild -project Bildeditor.xcodeproj -scheme Bildeditor -configuration Release \
+            -derivedDataPath build ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO build 2>&1 | tee "$RUNNER_TEMP/build.log" | grep -E "error:|warning:|BUILD" || true
+          test -d build/Build/Products/Release/Bildeditor.app
+          lipo -info build/Build/Products/Release/Bildeditor.app/Contents/MacOS/Bildeditor
+
+      - name: App-Tests
+        run: |
+          set -o pipefail
+          xcodebuild -project Bildeditor.xcodeproj -scheme Bildeditor -configuration Debug \
+            -derivedDataPath build-test test 2>&1 | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case|Executed|TEST" || true
+
+      - name: Selbsttest der fertigen App (Fenster-Screenshots)
+        run: |
+          mkdir -p "$RUNNER_TEMP/selftest"
+          build/Build/Products/Release/Bildeditor.app/Contents/MacOS/Bildeditor --selftest "$RUNNER_TEMP/selftest" 2>&1 | tee "$RUNNER_TEMP/selftest/console.log"
+          cat "$RUNNER_TEMP/selftest/result.json"
+
+      - name: DMG
+        run: |
+          chmod +x Packaging/make_dmg.sh
+          Packaging/make_dmg.sh build/Build/Products/Release/Bildeditor.app "$RUNNER_TEMP/Bildeditor.dmg"
+
+      - name: Ergebnisse hochladen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ergebnisse
+          path: |
+            ${{ runner.temp }}/*.log
+            ${{ runner.temp }}/selftest
+          retention-days: 14
+
+      - name: DMG hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bildeditor-dmg
+          path: ${{ runner.temp }}/Bildeditor.dmg
+          retention-days: 30
