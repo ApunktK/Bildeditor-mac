@@ -315,7 +315,8 @@ final class ToolOptionsBar: NSView {
         finishButton.target = self; finishButton.action = #selector(finish)
         finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
 
-        stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
+        stack = NSStackView()
+        stack.setViews([toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel], in: .leading)
         stack.orientation = .horizontal
         stack.distribution = .gravityAreas
         stack.spacing = 10
