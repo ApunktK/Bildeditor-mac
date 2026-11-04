@@ -11,7 +11,7 @@ Stand: 04.11.2026 · Version 0.3.0 (Build 3) · **Phase 3 (Auswahl) weitgehend a
 |---|---|---|---|
 | 1 Referenzanalyse | Funktionsmatrix, Menüinventar, Architektur, Lizenzprüfung | **abgeschlossen** (offene Referenzmessungen R-1 bis R-10) | FUNCTION_MATRIX.md (243 Funktionen), MENU_INVENTORY.md, ARCHITECTURE.md, SOURCE_CODE_ANALYSIS.md, THIRD_PARTY_LICENSES.md |
 | 2 Grundanwendung | App, Hauptfenster, Menüs, Leisten, Register, Fenster, Zeichenfläche, Dateiverwaltung | **weitgehend abgeschlossen** – offen: Lineale, Einstellungsfenster, Lokalisierungsdateien | Bildeditor.app (Universal), DMG, Selbsttest 72/72 |
-| 3 Bildbearbeitungsengine | Auswahl, Zeichnen, Maus, Alpha, Ausschneiden/Einfügen | **Auswahl weitgehend abgeschlossen** – offen: Auswahl als JSON kopieren/einfügen, feste Größe/Verhältnis, Drehen/Skalieren beim Verschieben, Lineale; Zeichen-Engine folgt mit Phase 4 | Selbsttest 106/106 |
+| 3 Bildbearbeitungsengine | Auswahl, Zeichnen, Maus, Alpha, Ausschneiden/Einfügen | **Auswahl weitgehend abgeschlossen** – offen: Auswahl als JSON kopieren/einfügen, feste Größe/Verhältnis, Drehen/Skalieren beim Verschieben, Lineale; Zeichen-Engine folgt mit Phase 4 | Selbsttest 108/108 |
 | 4 Werkzeuge | 22 Werkzeuge (umgesetzt: Zoom, Hand, Rechteck-, Ellipsen-, Lassoauswahl, Zauberstab, Pixel/Auswahl verschieben) | teilweise | – |
 | 5 Ebenen und Farben | Ebenen ✔ (vorgezogen), 14 Mischmodi ✔, Farbenfenster ✔ (Grundfunktion), Bildgröße/Leinwand, Drehen/Zoomen | teilweise vorgezogen | siehe Matrix L-xx, BM-01, C-xx |
 | 6 Korrekturen und Effekte | 13 Korrekturen, 40 Effekte | nicht begonnen | – |

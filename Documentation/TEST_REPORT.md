@@ -17,7 +17,7 @@ Stand: 04.11.2026 · Version 0.3.0 (Build 3) · Branch `phase-2`
 |---|---|---|
 | EditorKit (Kern: Kacheln, Farben, Einheiten, Zoom, Mischmodi, Dokument, Verlauf, Ebenen, **Auswahlmaske, Auswahl-Operationen, schwebende Pixel**) | 53 | 53 bestanden (Linux und macOS) |
 | App-Tests (PNG-Hin-/Rückweg mit Halbtransparenz, JPEG auf Weiß, HSV, Palette, Zoomeingabe/-regler, Befehlstabelle ↔ Menüs, Tastenkürzel-Anzeige, Werkzeugtasten, Auswahlmodus aus Zusatztasten, Rechteck-Einrasten, Kontur) | 11 | 11 bestanden |
-| Selbsttest der Release-App | SELFTESTN | SELFTESTN bestanden |
+| Selbsttest der Release-App | 108 | 108 bestanden |
 | Universal-Binary | `lipo -info` | „x86_64 arm64“ |
 | DMG | `hdiutil verify` | gültig |
 
@@ -47,6 +47,8 @@ Stand: 04.11.2026 · Version 0.3.0 (Build 3) · Branch `phase-2`
 
 | Fund | Ursache | Behoben |
 |---|---|---|
+| CI meldete Erfolg, obwohl ein Selbsttest-Punkt fehlschlug | Ausgabe über `tee` ohne `pipefail` | ja (Selbsttest und App-Tests lassen den Lauf jetzt scheitern) |
+| Ausgeblendete Werkzeugoptionen kehrten nach Vergrößern des Fensters nicht zurück | Leiste hatte nur ihre Inhaltsbreite | ja |
 | Fenster wurde mit Zauberstab-Optionen breiter als 1280 pt | Werkzeugleiste ohne Kürzungsregel | ja (Optionen werden in schmalen Fenstern gekürzt, Modi als Symbole) |
 | Verschieben großer Stücke hätte das ganze Bild je Mausbewegung neu berechnet (Messung 12 MP: 0,3 s + 0,5 s) | Vorschau über den vollständigen Zustand | ja (schwebendes Stück wird als eigene Ebene der Anzeige gezeichnet; Einmischen erst beim Fertigstellen) |
 | Auswahländerung setzte das ganze Bild neu zusammen | Dokument meldete jede Änderung als Inhaltsänderung | ja (gezielte Meldungen: Auswahl, Ebenen, Größe) |
