@@ -293,7 +293,7 @@ final class ToolOptionsBar: NSView {
         floodPopup.controlSize = .small
         floodPopup.target = self; floodPopup.action = #selector(wandChanged)
         floodPopup.toolTip = "Flutmodus (⇧ beim Klicken kehrt ihn um)"
-        samplePopup.addItems(withTitles: ["Ebene", "Bild"])
+        samplePopup.addItems(withTitles: ["Aus Ebene", "Aus Bild"])
         samplePopup.controlSize = .small
         samplePopup.target = self; samplePopup.action = #selector(wandChanged)
         samplePopup.toolTip = "Farben aus der aktiven Ebene oder dem ganzen Bild vergleichen"
@@ -306,7 +306,8 @@ final class ToolOptionsBar: NSView {
         let tolTitle = NSTextField(labelWithString: "Toleranz:"); tolTitle.font = .systemFont(ofSize: 11)
         let floodTitle = NSTextField(labelWithString: "Flutmodus:"); floodTitle.font = .systemFont(ofSize: 11)
         let sampleTitle = NSTextField(labelWithString: "Stichprobe:"); sampleTitle.font = .systemFont(ofSize: 11)
-        wandGroup = NSStackView(views: [floodTitle, floodPopup, sampleTitle, samplePopup, tolTitle, toleranceSlider, toleranceLabel])
+        wandGroup = NSStackView(views: [floodPopup, samplePopup, tolTitle, toleranceSlider, toleranceLabel])
+        _ = (floodTitle, sampleTitle)
         wandGroup.spacing = 4
 
         finishButton.controlSize = .small

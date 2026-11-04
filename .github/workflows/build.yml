@@ -23,7 +23,9 @@ jobs:
 
       - name: Kern-Tests (EditorKit)
         working-directory: Packages/EditorKit
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/editorkit-tests.log"
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/editorkit-tests.log"
 
       - name: Projekt erzeugen
         run: |
@@ -43,9 +45,11 @@ jobs:
           set -o pipefail
           xcodebuild -project Bildeditor.xcodeproj -scheme Bildeditor -configuration Debug \
             -derivedDataPath build-test test 2>&1 | tee "$RUNNER_TEMP/test.log" | grep -E "error:|Test Case|Executed|TEST" || true
+          grep -q "TEST SUCCEEDED" "$RUNNER_TEMP/test.log"
 
       - name: Selbsttest der fertigen App (Fenster-Screenshots)
         run: |
+          set -o pipefail
           mkdir -p "$RUNNER_TEMP/selftest"
           build/Build/Products/Release/Bildeditor.app/Contents/MacOS/Bildeditor --selftest "$RUNNER_TEMP/selftest" 2>&1 | tee "$RUNNER_TEMP/selftest/console.log"
           cat "$RUNNER_TEMP/selftest/result.json"
