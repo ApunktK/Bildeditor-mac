@@ -317,6 +317,7 @@ final class ToolOptionsBar: NSView {
 
         stack = NSStackView(views: [toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel])
         stack.orientation = .horizontal
+        stack.distribution = .gravityAreas
         stack.spacing = 10
         // Schmale Fenster: zuerst den Hinweistext, dann die Zauberstab-Optionen ausblenden statt das Fenster zu verbreitern.
         stack.setClippingResistancePriority(.defaultLow, for: .horizontal)
@@ -327,7 +328,8 @@ final class ToolOptionsBar: NSView {
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -10),
+            // volle Breite, damit ausgeblendete Gruppen beim Vergrößern des Fensters zurückkehren
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
         NotificationCenter.default.addObserver(self, selector: #selector(docChanged), name: .documentChanged, object: nil)

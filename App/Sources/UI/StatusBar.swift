@@ -30,7 +30,8 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
         super.init(frame: frame)
         for l in [hint, sizeLabel, posLabel, selLabel] { l.font = .systemFont(ofSize: 11); l.lineBreakMode = .byTruncatingTail }
         hint.textColor = .secondaryLabelColor
-        hint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        hint.setContentCompressionResistancePriority(NSLayoutConstraint.Priority(200), for: .horizontal)
+        hint.setContentHuggingPriority(.required, for: .horizontal)
         sizeLabel.toolTip = "Bildgröße"
         posLabel.toolTip = "Mausposition (von links oben)"
         selLabel.toolTip = "Größe der Auswahl"
@@ -70,7 +71,9 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
         let selIcon = NSImageView(image: NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: "Auswahlgröße") ?? NSImage())
         for i in [sizeIcon, posIcon, selIcon] { i.contentTintColor = .secondaryLabelColor; i.symbolConfiguration = .init(pointSize: 11, weight: .regular) }
 
-        let right = NSStackView(views: [sizeIcon, sizeLabel, posIcon, posLabel, selIcon, selLabel, unitPopup, zoomField, quickSize, zoomOutButton, zoomSlider, zoomInButton])
+        let right = NSStackView()
+        right.distribution = .gravityAreas
+        right.setViews([sizeIcon, sizeLabel, posIcon, posLabel, selIcon, selLabel, unitPopup, zoomField, quickSize, zoomOutButton, zoomSlider, zoomInButton], in: .trailing)
         right.orientation = .horizontal
         right.spacing = 6
         // Schmale Fenster: weniger wichtige Angaben werden ausgeblendet statt das Fenster zu verbreitern.
@@ -88,7 +91,7 @@ final class StatusBarView: NSView, NSTextFieldDelegate {
             hint.centerYAnchor.constraint(equalTo: centerYAnchor),
             right.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             right.centerYAnchor.constraint(equalTo: centerYAnchor),
-            right.leadingAnchor.constraint(greaterThanOrEqualTo: hint.trailingAnchor, constant: 12),
+            right.leadingAnchor.constraint(equalTo: hint.trailingAnchor, constant: 12),
             sizeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 90),
             posLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
             selLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 80),
