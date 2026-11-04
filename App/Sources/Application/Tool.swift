@@ -83,7 +83,6 @@ enum Tool: String, CaseIterable {
     var plannedPhase: Int? {
         switch self {
         case .zoom, .pan: return nil
-        case .rectangleSelect, .lassoSelect, .ellipseSelect, .magicWand, .moveSelectedPixels, .moveSelection: return 3
         default: return 4
         }
     }

@@ -1,4 +1,5 @@
 """Erzeugt FUNCTION_MATRIX.md und function_matrix.csv aus den Teil-Dateien m1..m5."""
+import sys, pathlib; sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import csv, importlib.util, pathlib, sys
 here = pathlib.Path(__file__).parent
 parts = [("Hauptfenster, Fenster, Werkzeugleiste, Register, Statusleiste", "m1_ui"),
@@ -9,6 +10,7 @@ parts = [("Hauptfenster, Fenster, Werkzeugleiste, Register, Statusleiste", "m1_u
 head = ["Funktions-ID", "Menüpfad", "Beschreibung", "Referenzverhalten", "Erforderliche Eingaben", "Standardwerte",
         "Zustandsänderung", "Fehlerfälle", "Mac-Umsetzung", "Testfall", "Status"]
 STATUS = "nicht implementiert"
+import status as st
 rows_all, sections, ids = [], [], set()
 for title, mod in parts:
     spec = importlib.util.spec_from_file_location(mod, here / f"{mod}.py"); m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
@@ -16,7 +18,8 @@ for title, mod in parts:
     for r in m.ROWS:
         assert len(r) == 10, (r[0], len(r))
         assert r[0] not in ids, "doppelte ID " + r[0]; ids.add(r[0])
-        rows.append(list(r) + [STATUS])
+        stv, note = st.STATUS.get(r[0], (STATUS, ""))
+        rows.append(list(r) + [stv + (f" ({note})" if note else "")])
     sections.append((title, rows)); rows_all += rows
 esc = lambda s: str(s).replace("|", "\\|").replace("\n", " ")
 unk = sum(1 for r in rows_all if "ungeklärt" in " ".join(r))
@@ -25,7 +28,7 @@ out = [
 "",
 "**Referenz:** Paint.NET 5.1.12 · **Quelle:** offizielle Dokumentation paint.net/doc/latest (57 Seiten, abgerufen 04.11.2026), Menü-Screenshots der Doku (Texterkennung), Release-Notes 5.0/5.1. Seitennamen in Klammern verweisen auf `https://paint.net/doc/latest/<Seite>.html`.",
 "",
-f"**Umfang:** {len(rows_all)} Funktionen · davon {unk} mit mindestens einem als **ungeklärt** markierten Punkt · Status aller Einträge: *{STATUS}* (Phase 1).",
+f"**Umfang:** {len(rows_all)} Funktionen · davon {unk} mit mindestens einem als **ungeklärt** markierten Punkt · Stand nach Phase 2: siehe Spalte *Status* und IMPLEMENTATION_STATUS.md.",
 "",
 "## Lesehinweise",
 "- **Standardwerte:** Die Dokumentation nennt fast keine Standardwerte und keine Wertebereiche. Werte aus Screenshots sind als *Beispiel* bzw. *Screenshot-Zustand* gekennzeichnet und **nicht** als Werkseinstellung belegt. Sie werden erst nach Messung an einer echten Paint.NET-5.1.12-Installation übernommen (siehe KNOWN_ISSUES, Punkt R-1).",

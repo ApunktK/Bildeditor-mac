@@ -14,12 +14,12 @@ extension AppController {
 
         // App-Menü
         r.register(Command("app.about", "Über Bildeditor", run: { [unowned self] in self.showAbout() }))
-        r.register(Command("app.settings", "Einstellungen …", shortcut: Shortcut(","), planned: 9))
+        r.register(Command("app.settings", "Einstellungen …", shortcut: Shortcut(","), planned: 8))
 
         // Datei
         r.register(Command("file.new", "Neu …", shortcut: Shortcut("n"), run: { NewImageDialog.run() }))
         r.register(Command("file.open", "Öffnen …", shortcut: Shortcut("o"), run: { [unowned self] in self.showOpenPanel() }))
-        r.register(Command("file.acquire", "Vom Scanner oder von der Kamera …", planned: 9))
+        r.register(Command("file.acquire", "Vom Scanner oder von der Kamera …", planned: 7))
         r.register(Command("file.save", "Speichern", shortcut: Shortcut("s"), enabled: hasDoc,
                            run: { [unowned self] in if let s = self.active { self.save(s, askForLocation: false) } }))
         r.register(Command("file.saveAs", "Speichern unter …", shortcut: Shortcut("s", [.command, .shift]), enabled: hasDoc,
@@ -80,8 +80,8 @@ extension AppController {
 
         // Bild
         r.register(Command("image.crop", "Auf Auswahl zuschneiden", shortcut: Shortcut("x", [.command, .shift]), planned: 3))
-        r.register(Command("image.resize", "Bildgröße ändern …", shortcut: Shortcut("r"), planned: 3))
-        r.register(Command("image.canvasSize", "Leinwandgröße …", shortcut: Shortcut("r", [.command, .shift]), planned: 3))
+        r.register(Command("image.resize", "Bildgröße ändern …", shortcut: Shortcut("r"), planned: 5))
+        r.register(Command("image.canvasSize", "Leinwandgröße …", shortcut: Shortcut("r", [.command, .shift]), planned: 5))
         r.register(Command("image.flipH", "Horizontal spiegeln", enabled: hasDoc, run: doc { $0.transformImage(.flipHorizontal) }))
         r.register(Command("image.flipV", "Vertikal spiegeln", enabled: hasDoc, run: doc { $0.transformImage(.flipVertical) }))
         r.register(Command("image.rotateCW", "90° im Uhrzeigersinn drehen", shortcut: fn(NSRightArrowFunctionKey, [.command, .option]),
@@ -89,7 +89,7 @@ extension AppController {
         r.register(Command("image.rotateCCW", "90° gegen den Uhrzeigersinn drehen", shortcut: fn(NSLeftArrowFunctionKey, [.command, .option]),
                            enabled: hasDoc, run: doc { $0.transformImage(.rotate90CCW) }))
         r.register(Command("image.rotate180", "180° drehen", enabled: hasDoc, run: doc { $0.transformImage(.rotate180) }))
-        r.register(Command("image.colorProfile", "Farbprofil …", planned: 9))
+        r.register(Command("image.colorProfile", "Farbprofil …", planned: 7))
         r.register(Command("image.flatten", "Auf eine Ebene reduzieren", shortcut: Shortcut("f", [.command, .shift]),
                            enabled: docIf { $0.canFlatten }, run: doc { $0.flatten() }))
 
@@ -142,9 +142,9 @@ extension AppController {
         for (id, t, k) in adjustments { r.register(Command("adjust.\(id)", t, shortcut: k, planned: 6)) }
 
         // Effekte (Phase 7)
-        r.register(Command("effect.repeat", "Letzten Effekt wiederholen", shortcut: Shortcut("f"), planned: 7))
+        r.register(Command("effect.repeat", "Letzten Effekt wiederholen", shortcut: Shortcut("f"), planned: 6))
         for (group, items) in Self.effectGroups {
-            for (i, t) in items.enumerated() { r.register(Command("effect.\(group).\(i)", t, planned: 7)) }
+            for (i, t) in items.enumerated() { r.register(Command("effect.\(group).\(i)", t, planned: 6)) }
         }
 
         // Fenster
