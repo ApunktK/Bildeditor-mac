@@ -1,14 +1,14 @@
 # KNOWN_ISSUES.md
 
-Stand: Phase 1, 04.11.2026. Offene Punkte, Risiken und Konflikte. Jeder Punkt hat eine ID, auf die Matrix und Status verweisen.
+Stand: Phase 2, 04.11.2026. Offene Punkte, Risiken und Konflikte. Jeder Punkt hat eine ID, auf die Matrix und Status verweisen.
 
 ## B – Build und Umgebung
 
 | ID | Problem | Folge | Lösungsweg | Status |
 |---|---|---|---|---|
-| B-1 | Arbeitsumgebung ist Linux; Swift/AppKit/Metal/Xcode sind dort nicht verfügbar | Es kann weder kompiliert noch getestet noch eine DMG gebaut werden | (a) Mac des Nutzers verknüpfen (Xcode erforderlich) oder (b) GitHub-Repository + GitHub Actions (macOS-Runner) | **offen – Entscheidung des Nutzers** |
+| B-1 | Arbeitsumgebung ist Linux; AppKit/Xcode dort nicht verfügbar | – | GitHub-Repository + GitHub Actions (macOS-15-Runner) baut, testet und packt | **gelöst** (Phase 2) |
 | B-2 | Keine Apple-Developer-ID bekannt | App nur ad-hoc signierbar, nicht notarisierbar; Gatekeeper-Warnung beim ersten Start | Developer-ID-Zertifikat + notarytool, sonst Dokumentation „Rechtsklick › Öffnen“ | offen |
-| B-3 | Universal-Build für Intel nur testbar mit Intel-Mac oder Rosetta-Lauf | x86_64-Pfad ungetestet | Test über `arch -x86_64` auf Apple Silicon bzw. Intel-Runner | offen |
+| B-3 | Universal-Build für Intel nur testbar mit Intel-Mac oder Rosetta-Lauf | x86_64-Pfad ungetestet | Test über `arch -x86_64` auf Apple Silicon bzw. Intel-Runner | offen – Universal wird gebaut (lipo geprüft), ausgeführt nur arm64 |
 
 ## R – Referenz ungeklärt
 
@@ -22,8 +22,8 @@ Stand: Phase 1, 04.11.2026. Offene Punkte, Risiken und Konflikte. Jeder Punkt ha
 | R-6 | Füllstil-Muster (Anzahl, Aussehen), Strichmuster-Varianten | TB-26, TB-27 | Referenzmessung; Muster selbst gestalten |
 | R-7 | Paint.NET-Text-Rendermodi beruhen auf DirectWrite/ClearType | T-70 | Mac-Entsprechungen festlegen (Glatt = Core Text AA; „Scharf“ = Pixelraster-Hinting) und als Abweichung dokumentieren |
 | R-8 | Verhalten von Ausschneiden/Löschen/Umkehren **ohne** Auswahl | E-03, E-11, E-13 | Referenzmessung |
-| R-9 | Ob Sichtbarkeit umschalten einen Verlaufseintrag erzeugt | L-05 | Referenzmessung |
-| R-10 | Retina: Bedeutung von „100 %“ und Standardgröße 800×600 × DPI-Faktor | UI-04, V-05 | Vorschlag: 100 % = 1 Bildpixel pro logischem Punkt; Option für physische Pixel |
+| R-9 | Ob Sichtbarkeit umschalten einen Verlaufseintrag erzeugt | L-05 | Referenzmessung (vorläufig: erzeugt einen Verlaufseintrag „Ebeneneigenschaften“) |
+| R-10 | Retina: Bedeutung von „100 %“ und Standardgröße 800×600 × DPI-Faktor | UI-04, V-05 | Vorschlag: 100 % = 1 Bildpixel pro logischem Punkt; Option für physische Pixel (umgesetzt: 1 Bildpixel = 1 Punkt; Option für physische Pixel offen) |
 
 ## K – Tastenkürzel-Konflikte mit macOS
 
@@ -46,6 +46,30 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 | Strg+Alt+Umschalt+˜ | Diagnose | – | entfällt (Diagnose im Einstellungsfenster) |
 | Rechte Maustaste | viele Werkzeuge | Mac-Mäuse/Trackpads: Zwei-Finger-Klick; Ctrl+Klick = Kontextmenü | Rechtsklick/Zwei-Finger; Ctrl+Klick nicht als Rechtsklick-Ersatz in Werkzeugen |
 
+## A – Bewusste Abweichungen und vorläufige Entscheidungen (Phase 2)
+
+| ID | Punkt | Umsetzung | Grund |
+|---|---|---|---|
+| A-1 | Speichern als PNG/JPEG/… bei mehreren Ebenen | Datei erhält das zusammengefügte Bild, **die Ebenen im Editor bleiben erhalten** (Rückfrage „Zusammengefügt speichern“) | Referenz reduziert das Bild im Editor; Verhalten wird bei R-1 nachgemessen |
+| A-2 | Ausgangszustand „ungespeichert“ | ein frisches, unverändertes neues Bild wird ohne Rückfrage geschlossen und beim Öffnen einer Datei ersetzt | entspricht dem Startbild der Referenz |
+| A-3 | Kopieren ohne Auswahl | kopiert die ganze aktive Ebene | Auswahlmodell folgt in Phase 3 (R-8) |
+| A-4 | Farbrad | immer in voller Helligkeit dargestellt; Klick bei (fast) Schwarz setzt Hellwert 100 | sonst bei Schwarz unbenutzbar; Referenzverhalten ungeklärt |
+| A-5 | Standardpalette | eigene 96 Farben (16 Grau + 16 Farbtöne × 5 Abstufungen) | Referenzpalette nicht übernommen (L-4) |
+| A-6 | Werkzeugsymbole | Apple SF Symbols, Fensterschalter rechts in der Werkzeugleiste | eigene Optik (L-1) |
+| A-7 | Einfügen eines größeren Bildes als Ebene | Rückfrage: vergrößern / beibehalten / abbrechen | wie Referenz-Rückfrage, Wortlaut eigen |
+| A-8 | EXIF-Ausrichtung | beim Öffnen verlustfrei angewendet (nur 90°-Schritte/Spiegeln) | übliche Erwartung; Referenzverhalten ungeklärt |
+| A-9 | Farbraum | Bilder werden beim Öffnen nach sRGB umgerechnet, Farbprofil wird nicht mitgespeichert | Farbmanagement folgt mit I-09/FMT-15 |
+| A-10 | App-Sandbox | aus | freier Dateizugriff (Öffnen/Speichern überall, später Plugins); Hardened Runtime ist an |
+
+## F – Formate
+
+| ID | Problem | Folge | Lösungsweg |
+|---|---|---|---|
+| F-1 | ImageIO schreibt TIFF vormultipliziert | halbtransparente Pixel weichen beim TIFF-Hin-/Rückweg um ±1 ab (gemessen: R 200 → 199 bei α 128) | eigener TIFF-Schreiber mit „unassociated alpha“ (Phase 7) |
+| F-2 | ImageIO schreibt kein WebP, AVIF-Schreiben nicht angeboten | WebP/AVIF nur öffnen | Bibliothek prüfen (libwebp/libavif, Lizenz) in Phase 7 |
+| F-3 | Mehrseitige TIFF/animierte GIF | nur das erste Bild wird geöffnet | Phase 7 |
+| F-4 | Speichern-Konfiguration der Referenz (Vorschau, Dateigröße, Bittiefe, GIF-Dithering, TGA-RLE) | derzeit nur Format und Qualität | Phase 7 |
+
 ## L – Rechtliches / Marke
 
 | ID | Punkt | Umgang |
@@ -61,4 +85,5 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 |---|---|---|
 | T-1 | PDN-Schreiben ohne Zertifizierung könnte Dateien liefern, die Paint.NET nicht öffnet | Schreiben erst nach Test mit echtem Paint.NET freischalten; bis dahin natives Projektformat (FMT-02) |
 | T-2 | 10000×10000 px × mehrere Ebenen = mehrere GB | Kachelung, leere Kacheln sparen, Auslagerung, Warnung vor Speichermangel |
+| T-4 | Anzeige setzt das Bild bei jeder Änderung vollständig auf der CPU zusammen | bei sehr großen Bildern spürbar langsam | Metal-Komposit / kachelweise Aktualisierung (ARCHITECTURE), spätestens mit den Malwerkzeugen (Phase 4) |
 | T-3 | Pixelgenaue Gleichheit mit Referenz bei GPU-Effekten | Toleranzen je Effekt definieren und dokumentieren (Projektvorgabe 29) |

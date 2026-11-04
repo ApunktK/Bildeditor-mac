@@ -1,6 +1,6 @@
 # RELEASE_CHECKLIST.md
 
-Jeder Punkt wird erst abgehakt, wenn er praktisch geprüft ist. Stand: Phase 1 – keine Punkte erfüllt.
+Jeder Punkt wird erst abgehakt, wenn er praktisch geprüft ist. Stand: Phase 2 (0.2.0) – erfüllte Punkte sind praktisch im CI geprüft.
 
 ## Funktion (Abschnitt 34)
 - [ ] Funktionsmatrix vollständig bearbeitet (jede Zeile hat einen Endstatus)
@@ -14,17 +14,17 @@ Jeder Punkt wird erst abgehakt, wenn er praktisch geprüft ist. Stand: Phase 1 �
 - [ ] Alle unterstützten Formate getestet (Lesen/Schreiben/Alpha/Metadaten)
 - [ ] Oberfläche vollständig deutsch (automatischer Test auf unübersetzte Strings)
 - [ ] Stabil in normalen Abläufen (Beispiele A–E, Langlauftest)
-- [ ] Keine Windows-Komponenten
+- [x] Keine Windows-Komponenten (nur AppKit, ImageIO, Accelerate)
 
 ## Build und Paket (Abschnitt 30)
-- [ ] Xcode-Release-Build ohne Warnungen
-- [ ] Universal-Binary (`lipo -info` zeigt arm64 und x86_64)
+- [x] Xcode-Release-Build ohne Compiler-Warnungen (CI 04.11.2026; nur Hinweis des AppIntents-Werkzeugs)
+- [x] Universal-Binary (`lipo -info` zeigt arm64 und x86_64) – CI-Lauf 04.11.2026
 - [ ] Info.plist: Name, Version, Build, Bundle-ID, Mindest-macOS, Dateitypen, UTTypes
-- [ ] Eigenes App-Icon (alle Größen)
-- [ ] Entitlements geprüft (Sandbox ja/nein begründet)
-- [ ] Signiert (Developer ID) – **oder** dokumentiert ad-hoc
-- [ ] Notarisiert und gestapelt (`stapler validate`) – **oder** dokumentiert „nicht notarisiert“
-- [ ] DMG: App-Symbol, Verknüpfung „Programme“, Drag-&-Drop-Installation
+- [x] Eigenes App-Icon (alle Größen 16–1024)
+- [x] Entitlements geprüft (Sandbox aus, begründet in KNOWN_ISSUES A-10)
+- [x] Signiert (Developer ID) – **oder** dokumentiert ad-hoc → ad-hoc (B-2)
+- [x] Notarisiert und gestapelt (`stapler validate`) – **oder** dokumentiert „nicht notarisiert“ → **nicht notarisiert**
+- [ ] DMG: App-Symbol, Verknüpfung „Programme“, Drag-&-Drop-Installation (gebaut und `hdiutil verify` ok; Installation noch nicht von Hand geprüft)
 - [ ] DMG auf sauberem Mac installiert und gestartet (Apple Silicon)
 - [ ] Start auf Intel-Mac bzw. unter Rosetta geprüft
 
@@ -36,4 +36,4 @@ Jeder Punkt wird erst abgehakt, wenn er praktisch geprüft ist. Stand: Phase 1 �
 
 ## Recht
 - [ ] THIRD_PARTY_LICENSES.md vollständig, alle Hinweise in „Über“ sichtbar
-- [ ] Keine Paint.NET-Marke, -Icons, -Texte, -Grafiken im Bundle
+- [x] Keine Paint.NET-Marke, -Icons, -Texte, -Grafiken im Bundle (Name nur im Lizenz-/Abgrenzungshinweis)

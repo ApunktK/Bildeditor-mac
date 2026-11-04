@@ -112,3 +112,13 @@ Eigene Bundle-Schnittstelle (Swift-Protokoll + optional Metal-Shader), versionie
 ## 12. Build-Umgebung (offen)
 
 Bauen und Testen erfordert macOS mit Xcode. Die aktuelle Arbeitsumgebung ist Linux. Optionen: (a) Verknüpfung mit dem Mac des Nutzers, (b) GitHub Actions mit macOS-Runnern. Siehe KNOWN_ISSUES B-1.
+
+## Stand der Umsetzung (Phase 2)
+
+- **Befehlstabelle** (`App/Sources/Application/CommandRegistry.swift`, `AppCommands.swift`): jeder Menüpunkt, Werkzeugleistenknopf und jedes Tastenkürzel ist ein `Command` mit ID, Titel, Kürzel, Aktivbedingung und Aktion. Fehlt die Aktion, ist der Eintrag deaktiviert und nennt die geplante Phase. Rückgängig/Kopieren/Einfügen laufen über die Standard-Aktionen der Responder-Kette, damit Textfelder ihre eigenen Befehle behalten.
+- **Ein Hauptfenster für alle Bilder** mit Bildregister (wie Referenz); `AppController` hält die geöffneten `DocumentSession`s (Dokument + Zoom + Bildlaufposition + Anzeige-Zwischenspeicher).
+- **Benachrichtigungen** (`NotificationCenter`): `documentChanged` (mit `Document.Change`), `documentsChanged`, `viewSettingsChanged`, `toolChanged`, `paletteChanged`, `panelVisibilityChanged`.
+- **Anzeige:** vorerst CPU-Komposit (`Compositor.premultipliedBGRA`) als CGImage, gezeichnet mit Core Graphics (nächster Nachbar ab 100 %). Metal folgt, sobald Malwerkzeuge kachelweise Aktualisierung brauchen (KNOWN_ISSUES T-4).
+- **Dateien:** ImageIO + vImage, durchgehend gerades Alpha; atomisches Schreiben.
+- **Selbsttest** (`--selftest <Ordner>`): bedient die fertige App über die Befehlstabelle, prüft Pixel, schreibt Bildschirmfotos und `result.json`; Teil jedes CI-Laufs.
+- **Projekt:** `project.yml` (XcodeGen) erzeugt das Xcode-Projekt; `.github/workflows/build.yml` baut Universal, testet und packt die DMG.
