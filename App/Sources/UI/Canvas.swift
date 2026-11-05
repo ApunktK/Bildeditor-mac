@@ -89,6 +89,17 @@ final class CanvasView: NSView {
             path.stroke()
         }
         drawSelectionOverlays(ctx, session: s, controller: c, imageRect: ir)
+        if let (a, b) = c.shape.guide {
+            let pa = NSPoint(x: ir.minX + a.x * c.scale, y: ir.minY + a.y * c.scale)
+            let pb = NSPoint(x: ir.minX + b.x * c.scale, y: ir.minY + b.y * c.scale)
+            let line = NSBezierPath(); line.move(to: pa); line.line(to: pb); line.lineWidth = 1
+            NSColor.white.setStroke(); line.stroke()
+            line.setLineDash([4, 4], count: 2, phase: 0); NSColor.black.setStroke(); line.stroke()
+            for p in [pa, pb] {
+                let nub = NSBezierPath(ovalIn: NSRect(x: p.x - 5, y: p.y - 5, width: 10, height: 10))
+                NSColor.white.setFill(); nub.fill(); NSColor.black.setStroke(); nub.stroke()
+            }
+        }
         if let r = c.paint.brushOutline(origin: ir.origin, scale: c.scale), r.width >= 3 {
             let p = NSBezierPath(ovalIn: r)
             p.lineWidth = 1
@@ -191,6 +202,7 @@ final class CanvasController: NSObject {
     let canvasView = CanvasView()
     let selection = SelectionInteraction()
     let paint = PaintInteraction()
+    let shape = ShapeInteraction()
     /// Phase der Ameisenlinie (läuft über einen Zeitgeber).
     private(set) var antsPhase: CGFloat = 0
     private var antsTimer: Timer?
@@ -219,6 +231,7 @@ final class CanvasController: NSObject {
             self.canvasView.needsDisplay = true
             self.onSelectionInfo?(self.selection.displayedSize)
         }
+        shape.onChange = { [weak self] in self?.canvasView.needsDisplay = true }
         antsTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in self?.tickAnts() }
         NotificationCenter.default.addObserver(self, selector: #selector(clipResized), name: NSView.frameDidChangeNotification, object: clip)
     }
@@ -383,7 +396,7 @@ final class CanvasController: NSObject {
         case .zoom: return Self.zoomCursor
         case .rectangleSelect, .ellipseSelect, .lassoSelect, .magicWand: return .crosshair
         case .moveSelectedPixels, .moveSelection: return Self.moveCursor
-        case .paintbrush, .eraser, .pencil, .paintBucket: return .crosshair
+        case .paintbrush, .eraser, .pencil, .paintBucket, .gradient, .lineCurve, .shapes: return .crosshair
         case .colorPicker: return Self.pickerCursor
         default: return .arrow
         }
@@ -434,6 +447,11 @@ final class CanvasController: NSObject {
     func mouseDown(_ e: NSEvent, button: Button) {
         guard session != nil else { return }
         let tool: Tool = button == .middle ? .pan : effectiveTool
+        if tool.isShapeTool {
+            shapeToolActive = true
+            shape.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), right: button == .right)
+            return
+        }
         if tool.isPaintTool {
             paintToolActive = true
             paint.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)),
@@ -453,8 +471,14 @@ final class CanvasController: NSObject {
 
     private var selectionToolActive = false
     private var paintToolActive = false
+    private var shapeToolActive = false
 
     func mouseDragged(_ e: NSEvent) {
+        if shapeToolActive {
+            onPointerMoved?(pixel(at: e))
+            shape.drag(to: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), shift: e.modifierFlags.contains(.shift))
+            return
+        }
         if paintToolActive {
             onPointerMoved?(pixel(at: e))
             let p = imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil))
@@ -482,6 +506,11 @@ final class CanvasController: NSObject {
     }
 
     func mouseUp(_ e: NSEvent) {
+        if shapeToolActive {
+            shapeToolActive = false
+            shape.end(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), shift: e.modifierFlags.contains(.shift))
+            return
+        }
         if paintToolActive {
             paintToolActive = false
             paint.end(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)))

@@ -401,6 +401,64 @@ final class SelfTest {
             if let a = ctrl.active { ctrl.close(a) }
         }
 
+        // Farbverlauf, Linie, Formen (Phase 4b)
+        let sh = main.canvas.shape
+        func drag(_ t: Tool, _ a: CGPoint, _ b: CGPoint, right: Bool = false, shift: Bool = false) {
+            ctrl.tool = t
+            sh.begin(tool: t, at: a, right: right)
+            sh.drag(to: CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2), shift: shift)
+            sh.end(at: b, shift: shift)
+            pump(0.05)
+        }
+        ctrl.newDocument(NewImageParameters(width: 300, height: 200, dpi: 96))
+        pump()
+        if let g = ctrl.document {
+            ctrl.colors = ColorState(primary: .black, secondary: .white)
+            ctrl.paintBlend = .normal; ctrl.antialias = true
+            ctrl.gradientKind = .linear; ctrl.gradientTransparency = false; ctrl.gradientRepeat = .none
+            ctrl.tool = .gradient
+            check("Optionen Farbverlauf", main.toolOptions.visibleGroups == ["mischung", "verlauf"], main.toolOptions.visibleGroups.joined(separator: ","))
+            drag(.gradient, CGPoint(x: 0, y: 100), CGPoint(x: 300, y: 100))
+            let mid = g.layers[0].surface[150, 50]
+            check("Linearer Verlauf schwarz → weiß", g.layers[0].surface[0, 50].r < 3 && abs(Int(mid.r) - 128) <= 2 && g.layers[0].surface[299, 50].r > 252
+                  && g.history.last?.name == "Farbverlauf", "\(mid)")
+            drag(.gradient, CGPoint(x: 0, y: 100), CGPoint(x: 300, y: 100), right: true)
+            check("Rechte Taste kehrt den Verlauf um", g.layers[0].surface[0, 50].r > 252)
+            ctrl.gradientTransparency = true
+            drag(.gradient, CGPoint(x: 0, y: 0), CGPoint(x: 300, y: 0))
+            check("Transparenzmodus", g.layers[0].surface[2, 10].a > 250 && g.layers[0].surface[297, 10].a < 5)
+            ctrl.gradientTransparency = false
+            _ = perform("edit.undo")
+
+            ctrl.colors = ColorState(primary: ColorBgra(r: 200, g: 0, b: 0), secondary: ColorBgra(r: 0, g: 0, b: 200))
+            ctrl.tool = .lineCurve
+            check("Optionen Linie", main.toolOptions.visibleGroups == ["pinsel", "mischung", "linie"], main.toolOptions.visibleGroups.joined(separator: ","))
+            ctrl.brushWidth = 4; ctrl.lineDash = .solid; ctrl.arrowEnd = false
+            let h0 = g.history.count
+            drag(.lineCurve, CGPoint(x: 20, y: 150.5), CGPoint(x: 280, y: 152), shift: true)
+            check("Linie mit ⇧ waagrecht eingerastet", g.layers[0].surface[150, 150] == ColorBgra(r: 200, g: 0, b: 0)
+                  && g.history.count == h0 + 1 && g.history.last?.name == "Linie/Kurve", "\(g.layers[0].surface[150, 150])")
+            ctrl.arrowEnd = true; ctrl.lineDash = .dashed
+            drag(.lineCurve, CGPoint(x: 20, y: 180.5), CGPoint(x: 280, y: 180.5), right: true)
+            check("Gestrichelte Linie mit Pfeil, rechte Taste = Sekundärfarbe", g.layers[0].surface[276, 180] == ColorBgra(r: 0, g: 0, b: 200))
+            ctrl.arrowEnd = false; ctrl.lineDash = .solid
+
+            ctrl.tool = .shapes
+            check("Optionen Formen", main.toolOptions.visibleGroups == ["pinsel", "mischung", "form"], main.toolOptions.visibleGroups.joined(separator: ","))
+            ctrl.shapeKind = .rectangle; ctrl.shapeStyle = .fillAndOutline; ctrl.brushWidth = 4
+            drag(.shapes, CGPoint(x: 40, y: 20), CGPoint(x: 140, y: 90))
+            check("Rechteck gefüllt mit Kontur", g.layers[0].surface[90, 55] == ColorBgra(r: 0, g: 0, b: 200)
+                  && g.layers[0].surface[40, 55] == ColorBgra(r: 200, g: 0, b: 0) && g.history.last?.name == "Rechteck")
+            ctrl.shapeKind = .ellipse; ctrl.shapeStyle = .fill
+            drag(.shapes, CGPoint(x: 170, y: 20), CGPoint(x: 260, y: 60), shift: true)
+            check("Ellipse mit ⇧ = Kreis", g.layers[0].surface[215, 65] == ColorBgra(r: 200, g: 0, b: 0) && g.layers[0].surface[215, 112] != ColorBgra(r: 200, g: 0, b: 0))
+            ctrl.shapeKind = .triangle; ctrl.shapeStyle = .outline
+            drag(.shapes, CGPoint(x: 40, y: 100), CGPoint(x: 140, y: 140))
+            check("Dreieck als Kontur", g.history.last?.name == "Dreieck")
+            pump(0.2)
+            snapshot(main.window?.contentView, "12-verlauf-linie-formen")
+        }
+
         // Bildschirmfoto
         ctrl.tool = .paintbrush
         ctrl.brushWidth = 20

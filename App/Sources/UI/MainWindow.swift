@@ -258,6 +258,18 @@ final class ToolOptionsBar: NSView {
     private var brushGroup: NSStackView!
     private var blendGroup: NSStackView!
     private var pickerGroup: NSStackView!
+    // Verlauf, Linie, Formen
+    let gradientKindPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let gradientModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let gradientRepeatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let shapeKindPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let shapeStylePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let dashPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let arrowStartBox = NSButton(checkboxWithTitle: "Pfeil am Anfang", target: nil, action: nil)
+    let arrowEndBox = NSButton(checkboxWithTitle: "Pfeil am Ende", target: nil, action: nil)
+    private var gradientGroup: NSStackView!
+    private var shapeGroup: NSStackView!
+    private var lineGroup: NSStackView!
     private var modeGroup: NSStackView!
     private var wandGroup: NSStackView!
     private var stack: NSStackView!
@@ -357,15 +369,33 @@ final class ToolOptionsBar: NSView {
         pickerGroup = NSStackView(views: [pickerSizePopup, pickerSourcePopup, aTitle, pickerAfterPopup])
         pickerGroup.spacing = 4
 
+        for (p, items) in [(gradientKindPopup, GradientKind.allCases.map(\.displayName)), (gradientModePopup, ["Farbmodus", "Transparenzmodus"]),
+                           (gradientRepeatPopup, GradientRepeat.allCases.map(\.displayName)), (shapeKindPopup, ShapeKind.allCases.map(\.displayName)),
+                           (shapeStylePopup, ShapeStyle.allCases.map(\.displayName)), (dashPopup, DashStyle.allCases.map(\.displayName))] {
+            p.controlSize = .small
+            p.addItems(withTitles: items)
+            p.target = self; p.action = #selector(shapeOptionsChanged)
+        }
+        for b in [arrowStartBox, arrowEndBox] {
+            b.controlSize = .small; b.font = .systemFont(ofSize: 11); b.target = self; b.action = #selector(shapeOptionsChanged)
+        }
+        gradientGroup = NSStackView(views: [gradientKindPopup, gradientModePopup, gradientRepeatPopup])
+        gradientGroup.spacing = 4
+        shapeGroup = NSStackView(views: [shapeKindPopup, shapeStylePopup])
+        shapeGroup.spacing = 4
+        lineGroup = NSStackView(views: [dashPopup, arrowStartBox, arrowEndBox])
+        lineGroup.spacing = 4
+
         finishButton.controlSize = .small
         finishButton.bezelStyle = .rounded
         finishButton.target = self; finishButton.action = #selector(finish)
         finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
 
         stack = NSStackView()
-        stack.setViews([toolLabel, toolPopup, modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup, finishButton, optionsLabel], in: .leading)
+        stack.setViews([toolLabel, toolPopup, modeGroup, gradientGroup, shapeGroup, brushGroup, lineGroup, wandGroup, blendGroup, pickerGroup,
+                        finishButton, optionsLabel], in: .leading)
         // Gruppen nicht dehnen (sonst große Lücken); nur der Hinweistext nimmt Restplatz
-        for g in [modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup] as [NSStackView] {
+        for g in [modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup, gradientGroup, shapeGroup, lineGroup] as [NSStackView] {
             g.setHuggingPriority(.required, for: .horizontal)
         }
         optionsLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -421,6 +451,18 @@ final class ToolOptionsBar: NSView {
         let raw = blendPopup.selectedItem?.representedObject as? String ?? ""
         AppController.shared.paintBlend = raw == "ueberschreiben" ? .overwrite : .blend(BlendMode(rawValue: raw) ?? .normal)
     }
+    @objc private func shapeOptionsChanged() {
+        let c = AppController.shared
+        c.gradientKind = GradientKind.allCases[max(0, gradientKindPopup.indexOfSelectedItem)]
+        c.gradientTransparency = gradientModePopup.indexOfSelectedItem == 1
+        c.gradientRepeat = GradientRepeat.allCases[max(0, gradientRepeatPopup.indexOfSelectedItem)]
+        c.shapeKind = ShapeKind.allCases[max(0, shapeKindPopup.indexOfSelectedItem)]
+        c.shapeStyle = ShapeStyle.allCases[max(0, shapeStylePopup.indexOfSelectedItem)]
+        c.lineDash = DashStyle.allCases[max(0, dashPopup.indexOfSelectedItem)]
+        c.arrowStart = arrowStartBox.state == .on
+        c.arrowEnd = arrowEndBox.state == .on
+    }
+
     @objc private func pickerChanged() {
         let c = AppController.shared
         c.pickerSampleSize = pickerSizePopup.selectedItem?.tag ?? 1
@@ -436,6 +478,9 @@ final class ToolOptionsBar: NSView {
         if !wandGroup.isHidden { r.append("flut") }
         if !blendGroup.isHidden { r.append("mischung") }
         if !pickerGroup.isHidden { r.append("pipette") }
+        if !gradientGroup.isHidden { r.append("verlauf") }
+        if !shapeGroup.isHidden { r.append("form") }
+        if !lineGroup.isHidden { r.append("linie") }
         return r
     }
 
@@ -447,8 +492,19 @@ final class ToolOptionsBar: NSView {
         if let i = Tool.allCases.firstIndex(of: t) { toolPopup.selectItem(at: i) }
         modeGroup.isHidden = !t.isSelectionTool
         wandGroup.isHidden = !(t == .magicWand || t == .paintBucket)
-        brushGroup.isHidden = !t.hasBrushWidth
-        blendGroup.isHidden = !(t == .paintbrush || t == .pencil || t == .paintBucket)
+        brushGroup.isHidden = !(t.hasBrushWidth || t == .lineCurve || t == .shapes)
+        blendGroup.isHidden = !(t == .paintbrush || t == .pencil || t == .paintBucket || t.isShapeTool)
+        gradientGroup.isHidden = t != .gradient
+        shapeGroup.isHidden = t != .shapes
+        lineGroup.isHidden = t != .lineCurve
+        gradientKindPopup.selectItem(at: GradientKind.allCases.firstIndex(of: c.gradientKind) ?? 0)
+        gradientModePopup.selectItem(at: c.gradientTransparency ? 1 : 0)
+        gradientRepeatPopup.selectItem(at: GradientRepeat.allCases.firstIndex(of: c.gradientRepeat) ?? 0)
+        shapeKindPopup.selectItem(at: ShapeKind.allCases.firstIndex(of: c.shapeKind) ?? 0)
+        shapeStylePopup.selectItem(at: ShapeStyle.allCases.firstIndex(of: c.shapeStyle) ?? 0)
+        dashPopup.selectItem(at: DashStyle.allCases.firstIndex(of: c.lineDash) ?? 0)
+        arrowStartBox.state = c.arrowStart ? .on : .off
+        arrowEndBox.state = c.arrowEnd ? .on : .off
         pickerGroup.isHidden = t != .colorPicker
         widthField.stringValue = String(Int(c.brushWidth))
         widthStepper.doubleValue = c.brushWidth

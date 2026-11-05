@@ -85,6 +85,40 @@ final class AppController: NSObject {
             }
         }
     }
+    // Farbverlauf, Linie, Formen
+    var gradientKind: GradientKind {
+        get { GradientKind(rawValue: Self.d.string(forKey: "Verlauf.Typ") ?? "") ?? .linear }
+        set { Self.d.set(newValue.rawValue, forKey: "Verlauf.Typ") }
+    }
+    var gradientTransparency: Bool {
+        get { Self.d.bool(forKey: "Verlauf.Transparenz") }
+        set { Self.d.set(newValue, forKey: "Verlauf.Transparenz") }
+    }
+    var gradientRepeat: GradientRepeat {
+        get { GradientRepeat(rawValue: Self.d.string(forKey: "Verlauf.Wiederholung") ?? "") ?? .none }
+        set { Self.d.set(newValue.rawValue, forKey: "Verlauf.Wiederholung") }
+    }
+    var shapeKind: ShapeKind {
+        get { ShapeKind(rawValue: Self.d.string(forKey: "Form.Typ") ?? "") ?? .rectangle }
+        set { Self.d.set(newValue.rawValue, forKey: "Form.Typ") }
+    }
+    var shapeStyle: ShapeStyle {
+        get { ShapeStyle(rawValue: Self.d.string(forKey: "Form.Art") ?? "") ?? .outline }
+        set { Self.d.set(newValue.rawValue, forKey: "Form.Art") }
+    }
+    var lineDash: DashStyle {
+        get { DashStyle(rawValue: Self.d.string(forKey: "Linie.Strich") ?? "") ?? .solid }
+        set { Self.d.set(newValue.rawValue, forKey: "Linie.Strich") }
+    }
+    var arrowStart: Bool {
+        get { Self.d.bool(forKey: "Linie.PfeilAnfang") }
+        set { Self.d.set(newValue, forKey: "Linie.PfeilAnfang") }
+    }
+    var arrowEnd: Bool {
+        get { Self.d.bool(forKey: "Linie.PfeilEnde") }
+        set { Self.d.set(newValue, forKey: "Linie.PfeilEnde") }
+    }
+
     enum PickerAfter: Int { case stay = 0, previous = 1, pencil = 2 }
     /// Seitenlänge der Pipetten-Stichprobe (1, 3, 5, 7, 9).
     var pickerSampleSize: Int {
