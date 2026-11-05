@@ -65,7 +65,7 @@ final class CommandRegistry: NSObject, NSMenuItemValidation {
     func perform(_ id: String) -> Bool {
         guard let c = byID[id], c.canRun, let run = c.run else { NSSound.beep(); return false }
         // Schwebende Pixel vor anderen Befehlen fertigstellen (Referenz: Befehl = Fertigstellen).
-        if !Self.keepsFloating.contains(where: { id.hasPrefix($0) }) { AppController.shared.document?.settlePreview() }
+        if !Self.keepsFloating.contains(where: { id.hasPrefix($0) }) { AppController.shared.finishPendingEdits() }
         run()
         return true
     }

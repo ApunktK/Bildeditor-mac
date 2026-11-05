@@ -381,3 +381,17 @@ extension Document {
         return s
     }
 }
+
+extension Document {
+    /// Fertig gerastertes Bild (z. B. Text) an `origin` auf die aktive Ebene mischen, begrenzt durch die Auswahl.
+    public func stateWithImage(_ img: TiledSurface, at origin: PixelPoint, blend: PaintBlend, base: DocumentState? = nil) -> DocumentState {
+        var s = base ?? committedState
+        let li = s.activeLayerIndex
+        let sel = s.selection.flatMap { $0.isEmpty ? nil : $0 }
+        let rect = PixelRect(x: origin.x, y: origin.y, width: img.width, height: img.height)
+        s.layers[li].surface = Raster.paint(s.layers[li].surface, rect: rect, selection: sel, blend: blend,
+                                            coverage: { x, y in img[x - origin.x, y - origin.y].a == 0 ? 0 : 1 },
+                                            color: { x, y in img[x - origin.x, y - origin.y] })
+        return s
+    }
+}

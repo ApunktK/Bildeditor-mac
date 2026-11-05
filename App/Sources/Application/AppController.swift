@@ -41,8 +41,8 @@ final class AppController: NSObject {
         didSet {
             guard tool != oldValue else { return }
             previousTool = oldValue
-            // Werkzeugwechsel stellt schwebende Pixel fertig (Referenz: Fertigstellen)
-            document?.settlePreview()
+            // Werkzeugwechsel stellt schwebende Pixel und Text fertig (Referenz: Fertigstellen)
+            finishPendingEdits()
             NotificationCenter.default.post(name: .toolChanged, object: nil)
         }
     }
@@ -119,6 +119,43 @@ final class AppController: NSObject {
         set { Self.d.set(newValue, forKey: "Linie.PfeilEnde") }
     }
 
+    // Text
+    var textFontFamily: String {
+        get { Self.d.string(forKey: "Text.Schrift") ?? "Helvetica Neue" }
+        set { Self.d.set(newValue, forKey: "Text.Schrift") }
+    }
+    var textSize: Double {
+        get { let v = Self.d.double(forKey: "Text.Groesse"); return v >= 1 ? v : 24 }
+        set { Self.d.set(min(2000, max(1, newValue)), forKey: "Text.Groesse") }
+    }
+    var textBold: Bool { get { Self.d.bool(forKey: "Text.Fett") } set { Self.d.set(newValue, forKey: "Text.Fett") } }
+    var textItalic: Bool { get { Self.d.bool(forKey: "Text.Kursiv") } set { Self.d.set(newValue, forKey: "Text.Kursiv") } }
+    var textUnderline: Bool { get { Self.d.bool(forKey: "Text.Unterstrichen") } set { Self.d.set(newValue, forKey: "Text.Unterstrichen") } }
+    var textAlignment: NSTextAlignment {
+        get { NSTextAlignment(rawValue: Self.d.integer(forKey: "Text.Ausrichtung")) ?? .left }
+        set { Self.d.set(newValue.rawValue, forKey: "Text.Ausrichtung") }
+    }
+    /// Schrift aus Familie, Größe (Pixel) und Schnitt; Rückfall auf die Systemschrift.
+    var textFont: NSFont {
+        var traits: NSFontTraitMask = []
+        if textBold { traits.insert(.boldFontMask) }
+        if textItalic { traits.insert(.italicFontMask) }
+        let size = CGFloat(textSize)
+        return NSFontManager.shared.font(withFamily: textFontFamily, traits: traits, weight: textBold ? 9 : 5, size: size)
+            ?? NSFontManager.shared.font(withFamily: textFontFamily, traits: [], weight: 5, size: size)
+            ?? .systemFont(ofSize: size, weight: textBold ? .bold : .regular)
+    }
+
+    /// Quelle des Kopierstempels (Bildpixel) und fester Versatz der aktuellen Sitzung.
+    var cloneSource: PixelPoint?
+    var cloneOffset: (dx: Int, dy: Int)?
+
+    /// Offene Bearbeitungen abschließen: Text, schwebende Pixel (vor Befehlen, Werkzeug- oder Bildwechsel).
+    func finishPendingEdits() {
+        mainWindow?.canvas.text.commit()
+        document?.settlePreview()
+    }
+
     enum PickerAfter: Int { case stay = 0, previous = 1, pencil = 2 }
     /// Seitenlänge der Pipetten-Stichprobe (1, 3, 5, 7, 9).
     var pickerSampleSize: Int {
@@ -186,7 +223,7 @@ final class AppController: NSObject {
 
     func activate(_ s: DocumentSession?) {
         guard s !== active else { return }
-        active?.document.settlePreview()
+        if active != nil { finishPendingEdits() }
         mainWindow?.rememberViewState()
         active = s
         NotificationCenter.default.post(name: .documentsChanged, object: nil)

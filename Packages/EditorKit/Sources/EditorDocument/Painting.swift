@@ -29,6 +29,10 @@ public final class StrokeSession {
         case brush(ColorBgra)
         case pencil(ColorBgra)
         case eraser
+        /// Kopierstempel: Farbe von (x + dx, y + dy) des Ausgangszustands.
+        case clone(dx: Int, dy: Int)
+        /// Umfärben: Pixel ähnlich `from` (Toleranz 0…1) werden um (to − from) verschoben, Schattierung bleibt.
+        case recolor(from: ColorBgra, to: ColorBgra, tolerance: Double)
     }
 
     public let base: DocumentState
@@ -65,7 +69,10 @@ public final class StrokeSession {
     }
 
     public var historyName: String {
-        switch kind { case .brush: return "Pinsel"; case .pencil: return "Stift"; case .eraser: return "Radiergummi" }
+        switch kind {
+        case .brush: return "Pinsel"; case .pencil: return "Stift"; case .eraser: return "Radiergummi"
+        case .clone: return "Kopierstempel"; case .recolor: return "Umfärben"
+        }
     }
 
     /// Nächsten Punkt (Bildkoordinaten) anfügen; liefert den neu veränderten Bereich.
@@ -89,6 +96,18 @@ public final class StrokeSession {
         case .eraser:
             let a = Int(b.a) * (255 - c) / 255
             working[px, py] = a == 0 ? .transparent : ColorBgra(r: b.r, g: b.g, b: b.b, a: UInt8(a))
+        case let .clone(dx, dy):
+            let sx = px + dx, sy = py + dy
+            guard sx >= 0, sy >= 0, sx < base.size.width, sy < base.size.height else { return false }
+            working[px, py] = blend.apply(b, base.layers[layerIndex].surface[sx, sy], cov: c)
+        case let .recolor(from, to, tol):
+            guard floodColorMatches(from, b, tolerance: floodTolerance(fromFraction: tol)) else { return false }
+            // Helligkeit (Hellwert) des Pixels relativ zur Ausgangsfarbe übertragen, damit Schattierungen erhalten bleiben
+            let fv = Double(max(from.r, from.g, from.b)), pv = Double(max(b.r, b.g, b.b))
+            let k = fv > 0 ? pv / fv : 1
+            func sc(_ t: UInt8) -> UInt8 { UInt8(max(0, min(255, (Double(t) * k).rounded()))) }
+            let target = ColorBgra(r: sc(to.r), g: sc(to.g), b: sc(to.b), a: b.a)
+            working[px, py] = PaintBlend.overwrite.apply(b, target, cov: c)
         }
         return true
     }

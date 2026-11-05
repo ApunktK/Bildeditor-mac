@@ -96,3 +96,16 @@ final class ShapeTests: XCTestCase {
         XCTAssertEqual(s[50, 5].r, 255, "Transparenzmodus ändert keine Farbe")
     }
 }
+
+final class ImageStampTests: XCTestCase {
+    func testStateWithImage() {
+        let d = Document(size: PixelSize(50, 50), dpi: 96, name: "T")
+        var img = TiledSurface(width: 3, height: 2)
+        img[0, 0] = ColorBgra(r: 255, g: 0, b: 0)
+        img[1, 0] = ColorBgra(r: 0, g: 0, b: 0, a: 128)
+        let s = d.stateWithImage(img, at: PixelPoint(10, 10), blend: .normal).layers[0].surface
+        XCTAssertEqual(s[10, 10], ColorBgra(r: 255, g: 0, b: 0))
+        XCTAssertEqual(Int(s[11, 10].r), 127, accuracy: 1)
+        XCTAssertEqual(s[12, 10], .white)
+    }
+}

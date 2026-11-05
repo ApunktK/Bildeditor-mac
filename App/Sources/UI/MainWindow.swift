@@ -270,6 +270,16 @@ final class ToolOptionsBar: NSView {
     private var gradientGroup: NSStackView!
     private var shapeGroup: NSStackView!
     private var lineGroup: NSStackView!
+    private var tolGroup: NSStackView!
+    // Text
+    let fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let fontSizeField = NSTextField(string: "24")
+    let boldButton = NSButton(title: "F", target: nil, action: nil)
+    let italicButton = NSButton(title: "K", target: nil, action: nil)
+    let underlineButton = NSButton(title: "U", target: nil, action: nil)
+    let alignControl = NSSegmentedControl(labels: ["Links", "Mitte", "Rechts"], trackingMode: .selectOne, target: nil, action: nil)
+    let textAntialiasBox = NSButton(checkboxWithTitle: "Kantenglättung", target: nil, action: nil)
+    private var textGroup: NSStackView!
     private var modeGroup: NSStackView!
     private var wandGroup: NSStackView!
     private var stack: NSStackView!
@@ -329,7 +339,9 @@ final class ToolOptionsBar: NSView {
         let tolTitle = NSTextField(labelWithString: "Toleranz:"); tolTitle.font = .systemFont(ofSize: 11)
         let floodTitle = NSTextField(labelWithString: "Flutmodus:"); floodTitle.font = .systemFont(ofSize: 11)
         let sampleTitle = NSTextField(labelWithString: "Stichprobe:"); sampleTitle.font = .systemFont(ofSize: 11)
-        wandGroup = NSStackView(views: [floodPopup, samplePopup, tolTitle, toleranceSlider, toleranceLabel])
+        wandGroup = NSStackView(views: [floodPopup, samplePopup])
+        tolGroup = NSStackView(views: [tolTitle, toleranceSlider, toleranceLabel])
+        tolGroup.spacing = 4
         _ = (floodTitle, sampleTitle)
         wandGroup.spacing = 4
 
@@ -379,6 +391,26 @@ final class ToolOptionsBar: NSView {
         for b in [arrowStartBox, arrowEndBox] {
             b.controlSize = .small; b.font = .systemFont(ofSize: 11); b.target = self; b.action = #selector(shapeOptionsChanged)
         }
+        fontPopup.controlSize = .small
+        fontPopup.addItems(withTitles: NSFontManager.shared.availableFontFamilies.sorted())
+        fontSizeField.controlSize = .small
+        fontSizeField.alignment = .right
+        fontSizeField.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        fontSizeField.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        fontSizeField.toolTip = "Schriftgröße in Pixeln"
+        for (b, tip) in [(boldButton, "Fett"), (italicButton, "Kursiv"), (underlineButton, "Unterstrichen")] {
+            b.setButtonType(.pushOnPushOff); b.bezelStyle = .recessed; b.controlSize = .small; b.toolTip = tip
+        }
+        boldButton.font = .boldSystemFont(ofSize: 11)
+        italicButton.font = NSFontManager.shared.convert(.systemFont(ofSize: 11), toHaveTrait: .italicFontMask)
+        alignControl.controlSize = .small
+        textAntialiasBox.controlSize = .small; textAntialiasBox.font = .systemFont(ofSize: 11)
+        for c in [fontPopup, fontSizeField, boldButton, italicButton, underlineButton, alignControl, textAntialiasBox] as [NSControl] {
+            c.target = self; c.action = #selector(textOptionsChanged)
+        }
+        textGroup = NSStackView(views: [fontPopup, fontSizeField, boldButton, italicButton, underlineButton, alignControl, textAntialiasBox])
+        textGroup.spacing = 4
+
         gradientGroup = NSStackView(views: [gradientKindPopup, gradientModePopup, gradientRepeatPopup])
         gradientGroup.spacing = 4
         shapeGroup = NSStackView(views: [shapeKindPopup, shapeStylePopup])
@@ -392,10 +424,11 @@ final class ToolOptionsBar: NSView {
         finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
 
         stack = NSStackView()
-        stack.setViews([toolLabel, toolPopup, modeGroup, gradientGroup, shapeGroup, brushGroup, lineGroup, wandGroup, blendGroup, pickerGroup,
+        stack.setViews([toolLabel, toolPopup, modeGroup, textGroup, gradientGroup, shapeGroup, brushGroup, lineGroup, wandGroup, tolGroup, blendGroup, pickerGroup,
                         finishButton, optionsLabel], in: .leading)
         // Gruppen nicht dehnen (sonst große Lücken); nur der Hinweistext nimmt Restplatz
-        for g in [modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup, gradientGroup, shapeGroup, lineGroup] as [NSStackView] {
+        stack.setVisibilityPriority(NSStackView.VisibilityPriority(rawValue: 600), for: tolGroup)
+        for g in [modeGroup, brushGroup, wandGroup, tolGroup, blendGroup, pickerGroup, gradientGroup, shapeGroup, lineGroup, textGroup] as [NSStackView] {
             g.setHuggingPriority(.required, for: .horizontal)
         }
         optionsLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -451,6 +484,18 @@ final class ToolOptionsBar: NSView {
         let raw = blendPopup.selectedItem?.representedObject as? String ?? ""
         AppController.shared.paintBlend = raw == "ueberschreiben" ? .overwrite : .blend(BlendMode(rawValue: raw) ?? .normal)
     }
+    @objc private func textOptionsChanged() {
+        let c = AppController.shared
+        if let f = fontPopup.titleOfSelectedItem { c.textFontFamily = f }
+        if let v = Double(fontSizeField.stringValue.replacingOccurrences(of: ",", with: ".")), v >= 1 { c.textSize = v }
+        c.textBold = boldButton.state == .on
+        c.textItalic = italicButton.state == .on
+        c.textUnderline = underlineButton.state == .on
+        c.textAlignment = [NSTextAlignment.left, .center, .right][max(0, alignControl.selectedSegment)]
+        c.antialias = textAntialiasBox.state == .on
+        c.mainWindow?.canvas.text.optionsChanged()
+    }
+
     @objc private func shapeOptionsChanged() {
         let c = AppController.shared
         c.gradientKind = GradientKind.allCases[max(0, gradientKindPopup.indexOfSelectedItem)]
@@ -475,7 +520,9 @@ final class ToolOptionsBar: NSView {
         var r: [String] = []
         if !modeGroup.isHidden { r.append("modus") }
         if !brushGroup.isHidden { r.append("pinsel") }
+        if !textGroup.isHidden { r.append("text") }
         if !wandGroup.isHidden { r.append("flut") }
+        if !tolGroup.isHidden { r.append("toleranz") }
         if !blendGroup.isHidden { r.append("mischung") }
         if !pickerGroup.isHidden { r.append("pipette") }
         if !gradientGroup.isHidden { r.append("verlauf") }
@@ -492,8 +539,18 @@ final class ToolOptionsBar: NSView {
         if let i = Tool.allCases.firstIndex(of: t) { toolPopup.selectItem(at: i) }
         modeGroup.isHidden = !t.isSelectionTool
         wandGroup.isHidden = !(t == .magicWand || t == .paintBucket)
+        tolGroup.isHidden = !(t == .magicWand || t == .paintBucket || t == .recolor)
+        textGroup.isHidden = t != .text
+        fontPopup.selectItem(withTitle: c.textFontFamily)
+        if fontPopup.selectedItem == nil { fontPopup.selectItem(at: 0) }
+        if fontSizeField.currentEditor() == nil { fontSizeField.stringValue = String(Int(c.textSize)) }
+        boldButton.state = c.textBold ? .on : .off
+        italicButton.state = c.textItalic ? .on : .off
+        underlineButton.state = c.textUnderline ? .on : .off
+        alignControl.selectedSegment = c.textAlignment == .center ? 1 : (c.textAlignment == .right ? 2 : 0)
+        textAntialiasBox.state = c.antialias ? .on : .off
         brushGroup.isHidden = !(t.hasBrushWidth || t == .lineCurve || t == .shapes)
-        blendGroup.isHidden = !(t == .paintbrush || t == .pencil || t == .paintBucket || t.isShapeTool)
+        blendGroup.isHidden = !(t == .paintbrush || t == .pencil || t == .paintBucket || t.isShapeTool || t == .text || t == .cloneStamp)
         gradientGroup.isHidden = t != .gradient
         shapeGroup.isHidden = t != .shapes
         lineGroup.isHidden = t != .lineCurve

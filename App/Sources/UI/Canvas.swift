@@ -89,6 +89,26 @@ final class CanvasView: NSView {
             path.stroke()
         }
         drawSelectionOverlays(ctx, session: s, controller: c, imageRect: ir)
+        // Textrahmen mit Einfügemarke
+        if c.text.isEditing, let tr = c.text.textRect {
+            let r = NSRect(x: ir.minX + CGFloat(tr.minX) * c.scale, y: ir.minY + CGFloat(tr.minY) * c.scale,
+                           width: CGFloat(tr.width) * c.scale, height: CGFloat(tr.height) * c.scale)
+            let frame = NSBezierPath(rect: r.insetBy(dx: -2, dy: -2))
+            frame.setLineDash([3, 3], count: 2, phase: 0)
+            NSColor.controlAccentColor.setStroke(); frame.stroke()
+            NSColor.controlAccentColor.setFill()
+            NSRect(x: r.maxX + 1, y: r.maxY - min(r.height, CGFloat(AppController.shared.textSize) * c.scale), width: 1.5,
+                   height: min(r.height, CGFloat(AppController.shared.textSize) * c.scale)).fill()
+        }
+        // Quelle des Kopierstempels
+        if AppController.shared.tool == .cloneStamp, let src = AppController.shared.cloneSource {
+            let p = NSPoint(x: ir.minX + (CGFloat(src.x) + 0.5) * c.scale, y: ir.minY + (CGFloat(src.y) + 0.5) * c.scale)
+            let cross = NSBezierPath()
+            cross.move(to: NSPoint(x: p.x - 8, y: p.y)); cross.line(to: NSPoint(x: p.x + 8, y: p.y))
+            cross.move(to: NSPoint(x: p.x, y: p.y - 8)); cross.line(to: NSPoint(x: p.x, y: p.y + 8))
+            cross.lineWidth = 3; NSColor.white.setStroke(); cross.stroke()
+            cross.lineWidth = 1; NSColor.black.setStroke(); cross.stroke()
+        }
         if let (a, b) = c.shape.guide {
             let pa = NSPoint(x: ir.minX + a.x * c.scale, y: ir.minY + a.y * c.scale)
             let pb = NSPoint(x: ir.minX + b.x * c.scale, y: ir.minY + b.y * c.scale)
@@ -203,6 +223,7 @@ final class CanvasController: NSObject {
     let selection = SelectionInteraction()
     let paint = PaintInteraction()
     let shape = ShapeInteraction()
+    let text = TextInteraction()
     /// Phase der Ameisenlinie (läuft über einen Zeitgeber).
     private(set) var antsPhase: CGFloat = 0
     private var antsTimer: Timer?
@@ -232,6 +253,7 @@ final class CanvasController: NSObject {
             self.onSelectionInfo?(self.selection.displayedSize)
         }
         shape.onChange = { [weak self] in self?.canvasView.needsDisplay = true }
+        text.onChange = { [weak self] in self?.canvasView.needsDisplay = true }
         antsTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) { [weak self] _ in self?.tickAnts() }
         NotificationCenter.default.addObserver(self, selector: #selector(clipResized), name: NSView.frameDidChangeNotification, object: clip)
     }
@@ -396,7 +418,8 @@ final class CanvasController: NSObject {
         case .zoom: return Self.zoomCursor
         case .rectangleSelect, .ellipseSelect, .lassoSelect, .magicWand: return .crosshair
         case .moveSelectedPixels, .moveSelection: return Self.moveCursor
-        case .paintbrush, .eraser, .pencil, .paintBucket, .gradient, .lineCurve, .shapes: return .crosshair
+        case .paintbrush, .eraser, .pencil, .paintBucket, .gradient, .lineCurve, .shapes, .cloneStamp, .recolor: return .crosshair
+        case .text: return .iBeam
         case .colorPicker: return Self.pickerCursor
         default: return .arrow
         }
@@ -447,6 +470,15 @@ final class CanvasController: NSObject {
     func mouseDown(_ e: NSEvent, button: Button) {
         guard session != nil else { return }
         let tool: Tool = button == .middle ? .pan : effectiveTool
+        if tool == .text {
+            text.click(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), right: button == .right)
+            return
+        }
+        if tool == .cloneStamp && e.modifierFlags.contains(.command) {
+            paint.setCloneSource(imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)))
+            canvasView.needsDisplay = true
+            return
+        }
         if tool.isShapeTool {
             shapeToolActive = true
             shape.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), right: button == .right)
@@ -558,6 +590,7 @@ final class CanvasController: NSObject {
 
     func keyDown(_ e: NSEvent) -> Bool {
         let mods = e.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting([.capsLock, .numericPad, .function])
+        if text.isEditing && text.handleKey(e) { return true }   // beim Schreiben gehören alle Tasten dem Text
         if e.charactersIgnoringModifiers == " " && mods.isEmpty {
             if !e.isARepeat { spaceDown = true; canvasView.window?.invalidateCursorRects(for: canvasView) }
             return true

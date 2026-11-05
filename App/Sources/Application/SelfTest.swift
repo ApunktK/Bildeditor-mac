@@ -262,8 +262,7 @@ final class SelfTest {
         ctrl.tool = .pan
         check("Werkzeug Hand", ctrl.tool == .pan && main.toolOptions.toolPopup.titleOfSelectedItem == "Hand")
         check("Taste Z → Zoom", ctrl.handleSingleKey("z", shift: false) && ctrl.tool == .zoom)
-        _ = ctrl.handleSingleKey("t", shift: false)
-        check("Nicht umgesetztes Werkzeug nicht wählbar", ctrl.tool == .zoom)
+        check("Alle 19 Werkzeuge umgesetzt", Tool.allCases.allSatisfy(\.isImplemented))
         let before = ctrl.colors
         _ = ctrl.handleSingleKey("x", shift: false)
         check("Farben tauschen (X)", ctrl.colors.primary == before.secondary && ctrl.colors.secondary == before.primary)
@@ -359,7 +358,7 @@ final class SelfTest {
         st.layers[0].surface.fill(PixelRect(x: 300, y: 0, width: 3, height: 300), with: .black)
         d.commit(st, name: "Testlinie", kind: .edit)
         ctrl.tool = .paintBucket
-        check("Optionen Farbeimer: Flutmodus/Toleranz, Mischmodus", main.toolOptions.visibleGroups == ["flut", "mischung"],
+        check("Optionen Farbeimer: Flutmodus/Toleranz, Mischmodus", main.toolOptions.visibleGroups == ["flut", "toleranz", "mischung"],
               main.toolOptions.visibleGroups.joined(separator: ","))
         ctrl.wandGlobal = false; ctrl.wandTolerance = 0.5
         stroke(.paintBucket, [CGPoint(x: 350, y: 150)], right: true)
@@ -457,6 +456,52 @@ final class SelfTest {
             check("Dreieck als Kontur", g.history.last?.name == "Dreieck")
             pump(0.2)
             snapshot(main.window?.contentView, "12-verlauf-linie-formen")
+        }
+
+        // Text, Kopierstempel, Umfärben (Phase 4c)
+        ctrl.newDocument(NewImageParameters(width: 300, height: 200, dpi: 96))
+        pump()
+        if let t = ctrl.document {
+            let txt = main.canvas.text
+            ctrl.colors = ColorState(primary: ColorBgra(r: 0, g: 0, b: 0), secondary: .white)
+            ctrl.textFontFamily = "Helvetica Neue"; ctrl.textSize = 40; ctrl.textBold = true; ctrl.antialias = true; ctrl.paintBlend = .normal
+            ctrl.tool = .text
+            check("Optionen Text", main.toolOptions.visibleGroups == ["text", "mischung"], main.toolOptions.visibleGroups.joined(separator: ","))
+            let h0 = t.history.count
+            txt.click(at: CGPoint(x: 20, y: 20), right: false)
+            txt.type("Hallo")
+            check("Text: Vorschau ohne Verlaufsschritt", t.history.count == h0 && t.isPreviewing)
+            snapshot(main.window?.contentView, "13-text-bearbeiten")
+            ctrl.tool = .zoom      // Werkzeugwechsel stellt fertig
+            var dark = 0
+            for y in 20..<80 { for x in 20..<200 where t.layers[0].surface[x, y].r < 60 { dark += 1 } }
+            check("Text gerastert und übernommen", dark > 300 && t.history.count == h0 + 1 && t.history.last?.name == "Text", "\(dark) dunkle Pixel")
+            _ = perform("edit.undo")
+            check("Text rückgängig", t.layers[0].surface[40, 45] == .white)
+
+            // Kopierstempel: rotes Quadrat links, nach rechts klonen
+            var st = t.state
+            st.layers[0].surface.fill(PixelRect(x: 10, y: 120, width: 30, height: 30), with: ColorBgra(r: 220, g: 0, b: 0))
+            t.commit(st, name: "Testquadrat", kind: .edit)
+            ctrl.tool = .cloneStamp
+            ctrl.brushWidth = 20; ctrl.antialias = false
+            let paint = main.canvas.paint
+            paint.begin(tool: .cloneStamp, at: CGPoint(x: 150, y: 135), right: false, shift: false)
+            paint.end(at: CGPoint(x: 150, y: 135))
+            check("Kopierstempel ohne Quelle malt nicht", t.layers[0].surface[150, 135] == .white)
+            paint.setCloneSource(CGPoint(x: 25, y: 135))
+            paint.begin(tool: .cloneStamp, at: CGPoint(x: 150, y: 135), right: false, shift: false)
+            paint.end(at: CGPoint(x: 150, y: 135))
+            check("Kopierstempel", t.layers[0].surface[150, 135] == ColorBgra(r: 220, g: 0, b: 0) && t.history.last?.name == "Kopierstempel")
+
+            // Umfärben: Rot → Blau
+            ctrl.colors = ColorState(primary: ColorBgra(r: 0, g: 0, b: 220), secondary: ColorBgra(r: 220, g: 0, b: 0))
+            ctrl.tool = .recolor
+            check("Optionen Umfärben", main.toolOptions.visibleGroups == ["pinsel", "toleranz"], main.toolOptions.visibleGroups.joined(separator: ","))
+            paint.begin(tool: .recolor, at: CGPoint(x: 25, y: 135), right: false, shift: false)
+            paint.end(at: CGPoint(x: 25, y: 135))
+            check("Umfärben", t.layers[0].surface[25, 135] == ColorBgra(r: 0, g: 0, b: 220) && t.layers[0].surface[60, 135] == .white)
+            ctrl.antialias = true
         }
 
         // Bildschirmfoto

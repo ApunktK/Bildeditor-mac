@@ -131,4 +131,30 @@ final class PaintingTests: XCTestCase {
         XCTAssertEqual(bytes, Compositor.premultipliedBGRA(d.layers, size: d.size))
         XCTAssertNil(Compositor.changedRect(old: old, new: Array(old.dropLast()), size: d.size))
     }
+
+    func testCloneStamp() {
+        let d = makeDoc()
+        var st = d.state
+        st.layers[0].surface.fill(PixelRect(x: 10, y: 10, width: 10, height: 10), with: red)
+        d.commit(st, name: "x", kind: .edit)
+        let s = StrokeSession(base: d.state, kind: .clone(dx: -40, dy: 0), width: 6, antialias: false, blend: .normal)
+        s.add(x: 55, y: 15)
+        XCTAssertEqual(s.working[55, 15], red, "Quelle 40 px links")
+        XCTAssertEqual(s.working[70, 15], .white)
+        XCTAssertEqual(s.historyName, "Kopierstempel")
+    }
+
+    func testRecolorKeepsShadingAndIgnoresOthers() {
+        let d = makeDoc()
+        var st = d.state
+        st.layers[0].surface[20, 20] = ColorBgra(r: 200, g: 0, b: 0)
+        st.layers[0].surface[21, 20] = ColorBgra(r: 180, g: 0, b: 0)
+        d.commit(st, name: "x", kind: .edit)
+        let s = StrokeSession(base: d.state, kind: .recolor(from: ColorBgra(r: 200, g: 0, b: 0), to: ColorBgra(r: 0, g: 0, b: 200), tolerance: 0.5),
+                              width: 10, antialias: false, blend: .normal)
+        s.add(x: 21, y: 20.5)
+        XCTAssertEqual(s.working[20, 20], ColorBgra(r: 0, g: 0, b: 200))
+        XCTAssertEqual(s.working[21, 20], ColorBgra(r: 0, g: 0, b: 180), "Schattierung bleibt")
+        XCTAssertEqual(s.working[23, 20], .white, "Weiß weicht zu stark ab")
+    }
 }

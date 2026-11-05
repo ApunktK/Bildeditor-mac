@@ -83,8 +83,8 @@ enum Tool: String, CaseIterable {
     var plannedPhase: Int? {
         switch self {
         case .zoom, .pan, .rectangleSelect, .lassoSelect, .ellipseSelect, .magicWand, .moveSelectedPixels, .moveSelection,
-             .paintbrush, .pencil, .eraser, .paintBucket, .colorPicker, .gradient, .lineCurve, .shapes: return nil
-        default: return 4
+             .paintbrush, .pencil, .eraser, .paintBucket, .colorPicker, .gradient, .lineCurve, .shapes,
+             .text, .cloneStamp, .recolor: return nil
         }
     }
 
@@ -92,9 +92,10 @@ enum Tool: String, CaseIterable {
 
     var isSelectionTool: Bool { self == .rectangleSelect || self == .lassoSelect || self == .ellipseSelect || self == .magicWand }
     var isMoveTool: Bool { self == .moveSelectedPixels || self == .moveSelection }
-    var isPaintTool: Bool { self == .paintbrush || self == .pencil || self == .eraser || self == .paintBucket || self == .colorPicker }
+    var isPaintTool: Bool { self == .paintbrush || self == .pencil || self == .eraser || self == .paintBucket || self == .colorPicker
+        || self == .cloneStamp || self == .recolor }
     /// Werkzeuge mit Pinselbreite (Umriss als Mauszeiger).
-    var hasBrushWidth: Bool { self == .paintbrush || self == .eraser }
+    var hasBrushWidth: Bool { self == .paintbrush || self == .eraser || self == .cloneStamp || self == .recolor }
     /// Werkzeuge, die aufgezogen werden (Vorschau bis zum Loslassen).
     var isShapeTool: Bool { self == .gradient || self == .lineCurve || self == .shapes }
 
@@ -116,6 +117,9 @@ enum Tool: String, CaseIterable {
         case .colorPicker: return "Klick nimmt die Farbe als Primärfarbe auf · Rechtsklick: Sekundärfarbe"
         case .gradient: return "Ziehen: Verlauf von Primär- zu Sekundärfarbe · Rechte Taste: umgekehrt · ⇧: 15°-Schritte"
         case .lineCurve: return "Ziehen: Linie in der Primärfarbe · Rechte Taste: Sekundärfarbe · ⇧: 15°-Schritte"
+        case .text: return "Klick setzt die Einfügemarke, dann tippen · Eingabetaste: neue Zeile · Esc oder Klick daneben: fertigstellen"
+        case .cloneStamp: return "⌘-Klick legt die Quelle fest, dann malen · Rechte Taste ebenso"
+        case .recolor: return "Malen ersetzt Farben ähnlich der Sekundärfarbe durch die Primärfarbe (Toleranz) · Rechte Taste: umgekehrt"
         case .shapes: return "Ziehen: Form · ⇧: gleiche Seiten · Kontur = Primärfarbe, Füllung bei „gefüllt mit Kontur“ = Sekundärfarbe"
         default: return "\(title): noch nicht verfügbar (geplant für Phase \(plannedPhase ?? 0))"
         }

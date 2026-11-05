@@ -19,15 +19,38 @@ final class PaintInteraction {
     var isActive: Bool { stroke != nil || tool == .colorPicker && pickerActive }
     private var pickerActive = false
 
+    /// Kopierstempel: Quelle festlegen (⌘-Klick); der Versatz ergibt sich beim nächsten Strich.
+    func setCloneSource(_ p: CGPoint) {
+        ctrl.cloneSource = PixelPoint(Int(p.x.rounded(.down)), Int(p.y.rounded(.down)))
+        ctrl.cloneOffset = nil
+        onChange?()
+    }
+
     func begin(tool: Tool, at p: CGPoint, right: Bool, shift: Bool) {
         guard let d = ctrl.document else { return }
         self.tool = tool
         self.right = right
         let color = right ? ctrl.colors.secondary : ctrl.colors.primary
         switch tool {
-        case .paintbrush, .pencil, .eraser:
+        case .paintbrush, .pencil, .eraser, .cloneStamp, .recolor:
             d.settlePreview()
-            let kind: StrokeSession.Kind = tool == .eraser ? .eraser : (tool == .pencil ? .pencil(color) : .brush(color))
+            let kind: StrokeSession.Kind
+            switch tool {
+            case .eraser: kind = .eraser
+            case .pencil: kind = .pencil(color)
+            case .cloneStamp:
+                guard let src = ctrl.cloneSource else {
+                    NSSound.beep(); ctrl.mainWindow?.showTransientHint("Zuerst mit ⌘-Klick die Quelle festlegen."); return
+                }
+                if ctrl.cloneOffset == nil {
+                    ctrl.cloneOffset = (src.x - Int(p.x.rounded(.down)), src.y - Int(p.y.rounded(.down)))
+                }
+                kind = .clone(dx: ctrl.cloneOffset!.dx, dy: ctrl.cloneOffset!.dy)
+            case .recolor:
+                let from = right ? ctrl.colors.primary : ctrl.colors.secondary, to = right ? ctrl.colors.secondary : ctrl.colors.primary
+                kind = .recolor(from: from, to: to, tolerance: ctrl.wandTolerance)
+            default: kind = .brush(color)
+            }
             let s = StrokeSession(base: d.state, kind: kind, width: tool == .pencil ? 1 : ctrl.brushWidth,
                                   antialias: tool == .pencil ? false : ctrl.antialias, blend: ctrl.paintBlend)
             if shift, let le = lastEnd, le.tool == tool { s.add(x: le.x, y: le.y) }
