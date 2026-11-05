@@ -25,6 +25,11 @@ final class DocumentSession {
     var needsInitialFit = true
 
     private var cachedComposite: CGImage?
+    private var compositeDirty = true
+    /// Vormultiplizierter Gesamtpuffer und die Ebenen, die er zeigt – für kachelweise Aktualisierung.
+    private var compositeBytes: [UInt8] = []
+    private var compositeLayers: [Layer] = []
+    private var compositeSize = PixelSize(0, 0)
     private var cachedThumbnail: NSImage?
     private var token: UUID?
 
@@ -33,7 +38,7 @@ final class DocumentSession {
         token = document.observe { [weak self] change in
             guard let self else { return }
             switch change {
-            case .content, .layers, .size: self.cachedComposite = nil; self.cachedThumbnail = nil; self.cachedOutline = nil
+            case .content, .layers, .size: self.compositeDirty = true; self.cachedThumbnail = nil; self.cachedOutline = nil
             case .selection: self.cachedOutline = nil
             default: break
             }
@@ -47,7 +52,20 @@ final class DocumentSession {
 
     /// Komposit für die Anzeige (zwischengespeichert bis zur nächsten Änderung).
     var composite: CGImage? {
-        if cachedComposite == nil { cachedComposite = ImageRendering.composite(document.state) }
+        guard compositeDirty || cachedComposite == nil else { return cachedComposite }
+        let st = document.state
+        compositeDirty = false
+        if compositeSize == st.size, !compositeBytes.isEmpty,
+           let r = Compositor.changedRect(old: compositeLayers, new: st.layers, size: st.size) {
+            // Nur die geänderten Kacheln neu zusammensetzen (Malen, Verschieben, Füllen …)
+            if !r.isEmpty { Compositor.updatePremultiplied(&compositeBytes, layers: st.layers, size: st.size, rect: r) }
+            else if cachedComposite != nil { compositeLayers = st.layers; return cachedComposite }
+        } else {
+            compositeBytes = Compositor.premultipliedBGRA(st.layers, size: st.size)
+            compositeSize = st.size
+        }
+        compositeLayers = st.layers
+        cachedComposite = ImageRendering.cgImage(premultipliedBGRA: compositeBytes, width: st.size.width, height: st.size.height)
         return cachedComposite
     }
 

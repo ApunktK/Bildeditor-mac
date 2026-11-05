@@ -82,7 +82,8 @@ enum Tool: String, CaseIterable {
 
     var plannedPhase: Int? {
         switch self {
-        case .zoom, .pan, .rectangleSelect, .lassoSelect, .ellipseSelect, .magicWand, .moveSelectedPixels, .moveSelection: return nil
+        case .zoom, .pan, .rectangleSelect, .lassoSelect, .ellipseSelect, .magicWand, .moveSelectedPixels, .moveSelection,
+             .paintbrush, .pencil, .eraser, .paintBucket, .colorPicker: return nil
         default: return 4
         }
     }
@@ -91,6 +92,9 @@ enum Tool: String, CaseIterable {
 
     var isSelectionTool: Bool { self == .rectangleSelect || self == .lassoSelect || self == .ellipseSelect || self == .magicWand }
     var isMoveTool: Bool { self == .moveSelectedPixels || self == .moveSelection }
+    var isPaintTool: Bool { self == .paintbrush || self == .pencil || self == .eraser || self == .paintBucket || self == .colorPicker }
+    /// Werkzeuge mit Pinselbreite (Umriss als Mauszeiger).
+    var hasBrushWidth: Bool { self == .paintbrush || self == .eraser }
 
     /// Hinweis in der Statusleiste (eigener Text).
     var statusHint: String {
@@ -103,6 +107,11 @@ enum Tool: String, CaseIterable {
         case .magicWand: return "Klicken wählt ähnliche Farben · ⇧ global · ⌘ hinzufügen · ⌥ abziehen"
         case .moveSelectedPixels: return "Ziehen verschiebt die ausgewählten Pixel · ⌘ Kopie · Pfeiltasten 1 px (⌘ 10 px) · Eingabetaste: fertigstellen"
         case .moveSelection: return "Ziehen verschiebt nur die Auswahlkontur · Pfeiltasten 1 px (⌘ 10 px)"
+        case .paintbrush: return "Linke Taste: Primärfarbe · Rechte Taste: Sekundärfarbe · ⇧-Klick: gerade Linie vom letzten Punkt"
+        case .pencil: return "1 Pixel breit, ohne Kantenglättung · Rechte Taste: Sekundärfarbe · ⇧-Klick: gerade Linie"
+        case .eraser: return "Macht Pixel der aktiven Ebene durchsichtig · ⇧-Klick: gerade Linie"
+        case .paintBucket: return "Klick füllt ähnliche Farben mit der Primärfarbe · Rechtsklick: Sekundärfarbe · ⇧: global"
+        case .colorPicker: return "Klick nimmt die Farbe als Primärfarbe auf · Rechtsklick: Sekundärfarbe"
         default: return "\(title): noch nicht verfügbar (geplant für Phase \(plannedPhase ?? 0))"
         }
     }

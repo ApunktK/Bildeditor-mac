@@ -89,6 +89,13 @@ final class CanvasView: NSView {
             path.stroke()
         }
         drawSelectionOverlays(ctx, session: s, controller: c, imageRect: ir)
+        if let r = c.paint.brushOutline(origin: ir.origin, scale: c.scale), r.width >= 3 {
+            let p = NSBezierPath(ovalIn: r)
+            p.lineWidth = 1
+            NSColor.white.withAlphaComponent(0.9).setStroke(); p.stroke()
+            let inner = NSBezierPath(ovalIn: r.insetBy(dx: 1, dy: 1))
+            NSColor.black.withAlphaComponent(0.8).setStroke(); inner.stroke()
+        }
         drawRubberBand()
     }
 
@@ -183,6 +190,7 @@ final class CanvasController: NSObject {
     let scrollView = DropScrollView()
     let canvasView = CanvasView()
     let selection = SelectionInteraction()
+    let paint = PaintInteraction()
     /// Phase der Ameisenlinie (läuft über einen Zeitgeber).
     private(set) var antsPhase: CGFloat = 0
     private var antsTimer: Timer?
@@ -375,6 +383,8 @@ final class CanvasController: NSObject {
         case .zoom: return Self.zoomCursor
         case .rectangleSelect, .ellipseSelect, .lassoSelect, .magicWand: return .crosshair
         case .moveSelectedPixels, .moveSelection: return Self.moveCursor
+        case .paintbrush, .eraser, .pencil, .paintBucket: return .crosshair
+        case .colorPicker: return Self.pickerCursor
         default: return .arrow
         }
     }
@@ -384,6 +394,13 @@ final class CanvasController: NSObject {
         guard let img = NSImage(systemSymbolName: "plus.magnifyingglass", accessibilityDescription: "Zoom")?
             .withSymbolConfiguration(cfg) else { return .crosshair }
         return NSCursor(image: img, hotSpot: NSPoint(x: img.size.width * 0.4, y: img.size.height * 0.4))
+    }()
+
+    static let pickerCursor: NSCursor = {
+        let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
+        guard let img = NSImage(systemSymbolName: "eyedropper", accessibilityDescription: "Farbpipette")?
+            .withSymbolConfiguration(cfg) else { return .crosshair }
+        return NSCursor(image: img, hotSpot: NSPoint(x: 1, y: img.size.height - 1))
     }()
 
     static let moveCursor: NSCursor = {
@@ -401,13 +418,28 @@ final class CanvasController: NSObject {
     func pointerMoved(_ e: NSEvent) {
         guard session != nil else { onPointerMoved?(nil); return }
         onPointerMoved?(pixel(at: e))
+        updateBrushHover(imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)))
     }
 
-    func pointerExited() { }
+    func pointerExited() { updateBrushHover(nil) }
+
+    /// Pinselumriss neu zeichnen (nur alter und neuer Bereich).
+    private func updateBrushHover(_ p: CGPoint?) {
+        let o = canvasView.imageOrigin
+        if let old = paint.brushOutline(origin: o, scale: scale) { canvasView.setNeedsDisplay(old.insetBy(dx: -3, dy: -3)) }
+        paint.hover = p
+        if let new = paint.brushOutline(origin: o, scale: scale) { canvasView.setNeedsDisplay(new.insetBy(dx: -3, dy: -3)) }
+    }
 
     func mouseDown(_ e: NSEvent, button: Button) {
         guard session != nil else { return }
         let tool: Tool = button == .middle ? .pan : effectiveTool
+        if tool.isPaintTool {
+            paintToolActive = true
+            paint.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)),
+                        right: button == .right, shift: e.modifierFlags.contains(.shift))
+            return
+        }
         if tool.isSelectionTool || tool.isMoveTool {
             selectionToolActive = true
             selection.begin(tool: tool, at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)),
@@ -420,8 +452,16 @@ final class CanvasController: NSObject {
     }
 
     private var selectionToolActive = false
+    private var paintToolActive = false
 
     func mouseDragged(_ e: NSEvent) {
+        if paintToolActive {
+            onPointerMoved?(pixel(at: e))
+            let p = imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil))
+            updateBrushHover(p)
+            paint.drag(to: p)
+            return
+        }
         if selectionToolActive {
             onPointerMoved?(pixel(at: e))
             selection.drag(to: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), modifiers: .init(e, right: false))
@@ -442,6 +482,11 @@ final class CanvasController: NSObject {
     }
 
     func mouseUp(_ e: NSEvent) {
+        if paintToolActive {
+            paintToolActive = false
+            paint.end(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)))
+            return
+        }
         if selectionToolActive {
             selectionToolActive = false
             selection.end(at: imagePoint(fromView: canvasView.convert(e.locationInWindow, from: nil)), modifiers: .init(e, right: false))

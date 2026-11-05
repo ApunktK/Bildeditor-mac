@@ -303,6 +303,114 @@ final class SelfTest {
 
         try? FileManager.default.removeItem(at: tmp)
         selectionSteps(main)
+        paintSteps(main)
+    }
+
+    // MARK: Phase 4 – Malwerkzeuge
+
+    private func paintSteps(_ main: MainWindowController) {
+        let paint = main.canvas.paint
+        ctrl.newDocument(NewImageParameters(width: 400, height: 300, dpi: 96))
+        pump()
+        guard let d = ctrl.document else { check("Malen: Testbild", false); return }
+        let red = ColorBgra(r: 230, g: 20, b: 20), blue = ColorBgra(r: 20, g: 60, b: 230)
+        ctrl.colors = ColorState(primary: red, secondary: blue)
+        ctrl.brushWidth = 10; ctrl.antialias = true; ctrl.paintBlend = .normal
+        func stroke(_ t: Tool, _ pts: [CGPoint], right: Bool = false, shift: Bool = false) {
+            ctrl.tool = t
+            paint.begin(tool: t, at: pts[0], right: right, shift: shift)
+            for p in pts.dropFirst() { paint.drag(to: p) }
+            paint.end(at: pts.last!)
+            pump(0.05)
+        }
+        check("Taste B → Pinsel", ctrl.handleSingleKey("b", shift: false) && ctrl.tool == .paintbrush)
+        check("Taste E → Radiergummi", ctrl.handleSingleKey("e", shift: false) && ctrl.tool == .eraser)
+        check("Taste K → Farbpipette", ctrl.handleSingleKey("k", shift: false) && ctrl.tool == .colorPicker)
+        ctrl.tool = .paintbrush
+        check("Optionen Pinsel: Breite, Mischmodus", main.toolOptions.visibleGroups == ["pinsel", "mischung"], main.toolOptions.visibleGroups.joined(separator: ","))
+        let n = d.history.count
+        stroke(.paintbrush, [CGPoint(x: 20, y: 30.25), CGPoint(x: 120, y: 30.25), CGPoint(x: 200, y: 30.25)])
+        check("Pinselstrich: ein Verlaufsschritt „Pinsel“", d.history.count == n + 1 && d.history.last?.name == "Pinsel")
+        check("Pinselstrich: Farbe in der Mitte", d.layers[0].surface[100, 30] == red, "\(d.layers[0].surface[100, 30])")
+        let edge = d.layers[0].surface[100, 25]
+        check("Pinselstrich: Kantenglättung am Rand", edge != red && edge != .white, "\(edge)")
+        check("Pinselstrich: außerhalb unverändert", d.layers[0].surface[100, 40] == .white)
+        stroke(.paintbrush, [CGPoint(x: 20, y: 60.5)], right: true)
+        check("Rechte Taste: Sekundärfarbe", d.layers[0].surface[20, 60] == blue)
+        stroke(.paintbrush, [CGPoint(x: 120, y: 60.5)], shift: true)
+        check("⇧-Klick: gerade Linie vom letzten Punkt", d.layers[0].surface[70, 60] == red, "\(d.layers[0].surface[70, 60])")
+
+        ctrl.tool = .pencil
+        check("Optionen Stift: Mischmodus", main.toolOptions.visibleGroups == ["mischung"])
+        stroke(.pencil, [CGPoint(x: 10.5, y: 100.5), CGPoint(x: 50.5, y: 100.5)])
+        check("Stift: 1 Pixel, ohne Kantenglättung", d.layers[0].surface[30, 100] == red && d.layers[0].surface[30, 101] == .white && d.layers[0].surface[30, 99] == .white)
+
+        stroke(.eraser, [CGPoint(x: 100, y: 30.25), CGPoint(x: 140, y: 30.25)])
+        check("Radiergummi: durchsichtig", d.layers[0].surface[120, 30] == .transparent && d.history.last?.name == "Radiergummi")
+
+        // Auswahl begrenzt das Malen
+        d.setSelection(.rectangle(PixelRect(x: 200, y: 150, width: 50, height: 50), in: d.size), name: "Rechteckauswahl")
+        stroke(.paintbrush, [CGPoint(x: 180, y: 175), CGPoint(x: 280, y: 175)])
+        check("Malen nur in der Auswahl", d.layers[0].surface[225, 175] == red && d.layers[0].surface[190, 175] == .white && d.layers[0].surface[260, 175] == .white)
+        _ = perform("edit.deselect")
+
+        // Farbeimer
+        var st = d.state
+        st.layers[0].surface.fill(PixelRect(x: 300, y: 0, width: 3, height: 300), with: .black)
+        d.commit(st, name: "Testlinie", kind: .edit)
+        ctrl.tool = .paintBucket
+        check("Optionen Farbeimer: Flutmodus/Toleranz, Mischmodus", main.toolOptions.visibleGroups == ["flut", "mischung"],
+              main.toolOptions.visibleGroups.joined(separator: ","))
+        ctrl.wandGlobal = false; ctrl.wandTolerance = 0.5
+        stroke(.paintBucket, [CGPoint(x: 350, y: 150)], right: true)
+        check("Farbeimer: zusammenhängend mit Sekundärfarbe", d.layers[0].surface[399, 299] == blue && d.layers[0].surface[302, 10] == .black
+              && d.layers[0].surface[290, 290] == .white && d.history.last?.name == "Farbeimer")
+
+        // Farbpipette
+        ctrl.colors = ColorState(primary: .black, secondary: .white)
+        ctrl.pickerSampleSize = 1; ctrl.pickerAfter = .previous
+        ctrl.tool = .paintbrush
+        ctrl.tool = .colorPicker
+        check("Optionen Pipette", main.toolOptions.visibleGroups == ["pipette"])
+        stroke(.colorPicker, [CGPoint(x: 360.5, y: 100.5)])
+        check("Pipette: Primärfarbe aufgenommen", ctrl.colors.primary == blue)
+        check("Pipette: zurück zum vorigen Werkzeug", ctrl.tool == .paintbrush)
+        ctrl.tool = .colorPicker
+        stroke(.colorPicker, [CGPoint(x: 100.5, y: 30.5)], right: true)
+        check("Pipette Rechtsklick: Sekundärfarbe", ctrl.colors.secondary == red, "\(ctrl.colors.secondary)")
+        ctrl.pickerAfter = .stay
+
+        // Leistung: Strich auf großem Bild (Kachel-Aktualisierung der Anzeige)
+        ctrl.newDocument(NewImageParameters(width: 4000, height: 3000, dpi: 96))
+        pump()
+        if let big = ctrl.document, let session = ctrl.active {
+            _ = session.composite
+            ctrl.brushWidth = 30
+            ctrl.tool = .paintbrush
+            let t0 = Date()
+            paint.begin(tool: .paintbrush, at: CGPoint(x: 100, y: 100), right: false, shift: false)
+            for i in 1...20 {
+                paint.drag(to: CGPoint(x: 100 + Double(i) * 10, y: 100 + Double(i) * 5))
+                _ = session.composite
+            }
+            let perStep = Date().timeIntervalSince(t0) / 20
+            paint.end(at: CGPoint(x: 300, y: 200))
+            Self.log("Pinsel auf 12 MP: \(Int(perStep * 1000)) ms je Mausbewegung")
+            check("Pinsel auf 12-MP-Bild flüssig (< 60 ms je Bewegung)", perStep < 0.06, "\(Int(perStep * 1000)) ms")
+            check("Großes Bild: Strich übernommen", big.history.last?.name == "Pinsel")
+            if let a = ctrl.active { ctrl.close(a) }
+        }
+
+        // Bildschirmfoto
+        ctrl.tool = .paintbrush
+        ctrl.brushWidth = 20
+        main.canvas.setZoom(200, anchor: nil)
+        main.canvas.center(onImage: CGPoint(x: 150, y: 100))
+        paint.hover = CGPoint(x: 160, y: 110)
+        pump(0.3)
+        snapshot(main.window?.contentView, "11-malen")
+        paint.hover = nil
+        ctrl.tool = .zoom
     }
 
     // MARK: Phase 3 – Auswahl

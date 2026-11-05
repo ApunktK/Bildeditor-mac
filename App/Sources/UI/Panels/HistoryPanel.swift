@@ -106,6 +106,7 @@ final class HistoryPanelController: NSViewController, NSTableViewDataSource, NST
         case .erase: return "eraser"
         case .fill: return "drop.fill"
         case .crop: return "crop"
+        case .paint: return "paintbrush.pointed"
         }
     }
 

@@ -52,3 +52,35 @@ public enum Compositor {
         }
     }
 }
+
+extension Compositor {
+    /// Bereich, in dem sich zwei Ebenenlisten unterscheiden. nil = Ebenen/Eigenschaften anders → alles neu.
+    public static func changedRect(old: [Layer], new: [Layer], size: PixelSize) -> PixelRect? {
+        guard old.count == new.count else { return nil }
+        var r = PixelRect.empty
+        for (a, b) in zip(old, new) {
+            guard a.id == b.id, a.properties == b.properties, a.surface.size == b.surface.size, a.surface.size == size else { return nil }
+            for (tx, ty) in b.surface.changedTiles(comparedTo: a.surface) {
+                let t = b.surface.tileRect(tx: tx, ty: ty)
+                r = r.isEmpty ? t : r.union(t)
+            }
+        }
+        return r
+    }
+
+    /// Aktualisiert einen Ausschnitt in einem vormultiplizierten Gesamtpuffer (Breite × Höhe × 4).
+    public static func updatePremultiplied(_ bytes: inout [UInt8], layers: [Layer], size: PixelSize, rect: PixelRect) {
+        let r = rect.intersection(PixelRect(size: size))
+        guard !r.isEmpty, bytes.count == size.width * size.height * 4 else { return }
+        let part = premultipliedBGRA(layers, size: size, rect: r)
+        let rowBytes = r.width * 4
+        part.withUnsafeBufferPointer { src in
+            bytes.withUnsafeMutableBufferPointer { dst in
+                for y in 0..<r.height {
+                    let d = ((r.minY + y) * size.width + r.minX) * 4
+                    for i in 0..<rowBytes { dst[d + i] = src[y * rowBytes + i] }
+                }
+            }
+        }
+    }
+}

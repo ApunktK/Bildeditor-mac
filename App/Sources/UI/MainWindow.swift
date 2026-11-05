@@ -247,6 +247,17 @@ final class ToolOptionsBar: NSView {
     let toleranceSlider = NSSlider(value: 50, minValue: 0, maxValue: 100, target: nil, action: nil)
     private let toleranceLabel = NSTextField(labelWithString: "50 %")
     let finishButton = NSButton(title: "Fertigstellen", target: nil, action: nil)
+    // Malwerkzeuge
+    let widthField = NSTextField(string: "10")
+    let widthStepper = NSStepper()
+    let antialiasBox = NSButton(checkboxWithTitle: "Kantenglättung", target: nil, action: nil)
+    let blendPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let pickerSizePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let pickerSourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let pickerAfterPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private var brushGroup: NSStackView!
+    private var blendGroup: NSStackView!
+    private var pickerGroup: NSStackView!
     private var modeGroup: NSStackView!
     private var wandGroup: NSStackView!
     private var stack: NSStackView!
@@ -310,13 +321,54 @@ final class ToolOptionsBar: NSView {
         _ = (floodTitle, sampleTitle)
         wandGroup.spacing = 4
 
+        // Pinselbreite, Kantenglättung, Mischmodus
+        let wTitle = NSTextField(labelWithString: "Breite:"); wTitle.font = .systemFont(ofSize: 11)
+        widthField.controlSize = .small
+        widthField.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+        widthField.alignment = .right
+        widthField.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        widthField.target = self; widthField.action = #selector(widthEntered)
+        widthField.toolTip = "Pinselbreite in Pixeln (1–2000)"
+        widthStepper.minValue = 1; widthStepper.maxValue = 2000; widthStepper.increment = 1
+        widthStepper.valueWraps = false; widthStepper.autorepeat = true; widthStepper.controlSize = .small
+        widthStepper.target = self; widthStepper.action = #selector(widthStepped)
+        antialiasBox.controlSize = .small; antialiasBox.font = .systemFont(ofSize: 11)
+        antialiasBox.target = self; antialiasBox.action = #selector(antialiasToggled)
+        brushGroup = NSStackView(views: [wTitle, widthField, widthStepper, antialiasBox])
+        brushGroup.spacing = 4
+        blendPopup.controlSize = .small
+        for m in BlendMode.allCases { blendPopup.addItem(withTitle: m.displayName); blendPopup.lastItem?.representedObject = m.rawValue }
+        blendPopup.menu?.addItem(.separator())
+        blendPopup.addItem(withTitle: "Überschreiben"); blendPopup.lastItem?.representedObject = "ueberschreiben"
+        blendPopup.target = self; blendPopup.action = #selector(blendChanged)
+        blendPopup.toolTip = "Mischmodus beim Auftragen; „Überschreiben“ ersetzt Pixel einschließlich Deckkraft"
+        let bTitle = NSTextField(labelWithString: "Mischmodus:"); bTitle.font = .systemFont(ofSize: 11)
+        blendGroup = NSStackView(views: [bTitle, blendPopup])
+        blendGroup.spacing = 4
+        // Farbpipette
+        pickerSizePopup.controlSize = .small
+        for n in [1, 3, 5, 7, 9] { pickerSizePopup.addItem(withTitle: n == 1 ? "Einzelnes Pixel" : "\(n) × \(n) Bereich"); pickerSizePopup.lastItem?.tag = n }
+        pickerSourcePopup.controlSize = .small
+        pickerSourcePopup.addItems(withTitles: ["Aus Ebene", "Aus Bild"])
+        pickerAfterPopup.controlSize = .small
+        pickerAfterPopup.addItems(withTitles: ["Werkzeug beibehalten", "Zum vorigen Werkzeug", "Zum Stift wechseln"])
+        for p in [pickerSizePopup, pickerSourcePopup, pickerAfterPopup] { p.target = self; p.action = #selector(pickerChanged) }
+        let aTitle = NSTextField(labelWithString: "Danach:"); aTitle.font = .systemFont(ofSize: 11)
+        pickerGroup = NSStackView(views: [pickerSizePopup, pickerSourcePopup, aTitle, pickerAfterPopup])
+        pickerGroup.spacing = 4
+
         finishButton.controlSize = .small
         finishButton.bezelStyle = .rounded
         finishButton.target = self; finishButton.action = #selector(finish)
         finishButton.toolTip = "Schwebende Pixel einmischen (Eingabetaste)"
 
         stack = NSStackView()
-        stack.setViews([toolLabel, toolPopup, modeGroup, wandGroup, finishButton, optionsLabel], in: .leading)
+        stack.setViews([toolLabel, toolPopup, modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup, finishButton, optionsLabel], in: .leading)
+        // Gruppen nicht dehnen (sonst große Lücken); nur der Hinweistext nimmt Restplatz
+        for g in [modeGroup, brushGroup, wandGroup, blendGroup, pickerGroup] as [NSStackView] {
+            g.setHuggingPriority(.required, for: .horizontal)
+        }
+        optionsLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         stack.orientation = .horizontal
         stack.distribution = .gravityAreas
         stack.spacing = 10
@@ -359,6 +411,34 @@ final class ToolOptionsBar: NSView {
 
     @objc private func finish() { AppController.shared.finishFloating() }
 
+    @objc private func widthEntered() {
+        guard let v = Double(widthField.stringValue.replacingOccurrences(of: ",", with: ".")), v >= 1 else { NSSound.beep(); refresh(); return }
+        AppController.shared.brushWidth = min(2000, v)
+    }
+    @objc private func widthStepped() { AppController.shared.brushWidth = widthStepper.doubleValue }
+    @objc private func antialiasToggled() { AppController.shared.antialias = antialiasBox.state == .on }
+    @objc private func blendChanged() {
+        let raw = blendPopup.selectedItem?.representedObject as? String ?? ""
+        AppController.shared.paintBlend = raw == "ueberschreiben" ? .overwrite : .blend(BlendMode(rawValue: raw) ?? .normal)
+    }
+    @objc private func pickerChanged() {
+        let c = AppController.shared
+        c.pickerSampleSize = pickerSizePopup.selectedItem?.tag ?? 1
+        c.pickerSampleImage = pickerSourcePopup.indexOfSelectedItem == 1
+        c.pickerAfter = AppController.PickerAfter(rawValue: pickerAfterPopup.indexOfSelectedItem) ?? .stay
+    }
+
+    /// Für den Selbsttest: welche Optionsgruppen gerade sichtbar sind.
+    var visibleGroups: [String] {
+        var r: [String] = []
+        if !modeGroup.isHidden { r.append("modus") }
+        if !brushGroup.isHidden { r.append("pinsel") }
+        if !wandGroup.isHidden { r.append("flut") }
+        if !blendGroup.isHidden { r.append("mischung") }
+        if !pickerGroup.isHidden { r.append("pipette") }
+        return r
+    }
+
     @objc private func docChanged() { finishButton.isEnabled = AppController.shared.document?.floating != nil }
 
     func refresh() {
@@ -366,7 +446,20 @@ final class ToolOptionsBar: NSView {
         let t = c.tool
         if let i = Tool.allCases.firstIndex(of: t) { toolPopup.selectItem(at: i) }
         modeGroup.isHidden = !t.isSelectionTool
-        wandGroup.isHidden = t != .magicWand
+        wandGroup.isHidden = !(t == .magicWand || t == .paintBucket)
+        brushGroup.isHidden = !t.hasBrushWidth
+        blendGroup.isHidden = !(t == .paintbrush || t == .pencil || t == .paintBucket)
+        pickerGroup.isHidden = t != .colorPicker
+        widthField.stringValue = String(Int(c.brushWidth))
+        widthStepper.doubleValue = c.brushWidth
+        antialiasBox.state = c.antialias ? .on : .off
+        switch c.paintBlend {
+        case .overwrite: blendPopup.selectItem(at: blendPopup.numberOfItems - 1)
+        case let .blend(m): blendPopup.selectItem(at: BlendMode.allCases.firstIndex(of: m) ?? 0)
+        }
+        pickerSizePopup.selectItem(withTag: c.pickerSampleSize)
+        pickerSourcePopup.selectItem(at: c.pickerSampleImage ? 1 : 0)
+        pickerAfterPopup.selectItem(at: c.pickerAfter.rawValue)
         finishButton.isHidden = !t.isMoveTool
         finishButton.isEnabled = c.document?.floating != nil
         modeControl.selectedSegment = SelectionMode.allCases.firstIndex(of: c.selectionMode) ?? 0

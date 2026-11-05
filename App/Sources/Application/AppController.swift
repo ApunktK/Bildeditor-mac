@@ -34,9 +34,13 @@ final class AppController: NSObject {
     /// Im Selbsttest keine modalen Rückfragen.
     var isSelfTest = false
 
+    /// Vorheriges Werkzeug (Farbpipette „zum vorigen Werkzeug wechseln“).
+    private(set) var previousTool: Tool = .zoom
+
     var tool: Tool = .zoom {
         didSet {
             guard tool != oldValue else { return }
+            previousTool = oldValue
             // Werkzeugwechsel stellt schwebende Pixel fertig (Referenz: Fertigstellen)
             document?.settlePreview()
             NotificationCenter.default.post(name: .toolChanged, object: nil)
@@ -57,6 +61,45 @@ final class AppController: NSObject {
         get { UserDefaults.standard.bool(forKey: "Zauberstab.Global") }
         set { UserDefaults.standard.set(newValue, forKey: "Zauberstab.Global") }
     }
+    // Malwerkzeuge
+    private static let d = UserDefaults.standard
+    /// Pinselbreite 1…2000 (Werkseinstellung der Referenz ungeklärt, R-1).
+    var brushWidth: Double {
+        get { let v = Self.d.double(forKey: "Pinsel.Breite"); return v >= 1 ? v : 10 }
+        set { Self.d.set(min(2000, max(1, newValue.rounded())), forKey: "Pinsel.Breite"); NotificationCenter.default.post(name: .toolChanged, object: nil) }
+    }
+    var antialias: Bool {
+        get { Self.d.object(forKey: "Pinsel.Kantenglaettung") as? Bool ?? true }
+        set { Self.d.set(newValue, forKey: "Pinsel.Kantenglaettung") }
+    }
+    var paintBlend: PaintBlend {
+        get {
+            let raw = Self.d.string(forKey: "Pinsel.Mischmodus") ?? ""
+            if raw == "ueberschreiben" { return .overwrite }
+            return .blend(BlendMode(rawValue: raw) ?? .normal)
+        }
+        set {
+            switch newValue {
+            case .overwrite: Self.d.set("ueberschreiben", forKey: "Pinsel.Mischmodus")
+            case let .blend(m): Self.d.set(m.rawValue, forKey: "Pinsel.Mischmodus")
+            }
+        }
+    }
+    enum PickerAfter: Int { case stay = 0, previous = 1, pencil = 2 }
+    /// Seitenlänge der Pipetten-Stichprobe (1, 3, 5, 7, 9).
+    var pickerSampleSize: Int {
+        get { let v = Self.d.integer(forKey: "Pipette.Groesse"); return [1, 3, 5, 7, 9].contains(v) ? v : 1 }
+        set { Self.d.set(newValue, forKey: "Pipette.Groesse") }
+    }
+    var pickerSampleImage: Bool {
+        get { Self.d.bool(forKey: "Pipette.Bild") }
+        set { Self.d.set(newValue, forKey: "Pipette.Bild") }
+    }
+    var pickerAfter: PickerAfter {
+        get { PickerAfter(rawValue: Self.d.integer(forKey: "Pipette.Danach")) ?? .stay }
+        set { Self.d.set(newValue.rawValue, forKey: "Pipette.Danach") }
+    }
+
     /// Stichprobe aus dem ganzen Bild statt der aktiven Ebene.
     var wandSampleImage: Bool {
         get { UserDefaults.standard.bool(forKey: "Zauberstab.Bild") }

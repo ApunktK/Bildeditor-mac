@@ -21,7 +21,7 @@ public struct DocumentState: Equatable, Sendable {
 public enum HistoryKind: String, Sendable {
     case newImage, openImage, layerAdd, layerDelete, layerDuplicate, layerMerge, layerMove, layerProperties,
          imageTransform, imageResize, flatten, paste, edit,
-         selection, selectionMove, pixelsMove, erase, fill, crop
+         selection, selectionMove, pixelsMove, erase, fill, crop, paint
 }
 
 public struct HistoryEntry: Sendable {
