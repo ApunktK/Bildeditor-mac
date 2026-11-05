@@ -126,6 +126,31 @@ public struct ShapeSpec: Equatable, Sendable {
         }
     }
 
+    /// Eckpunkte bei Vielecken (Dreieck, Raute) – deren Kontur folgt den Kanten.
+    var polygon: [(x: Double, y: Double)]? {
+        let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2
+        switch kind {
+        case .triangle: return [(cx, y0), (x1, y1), (x0, y1)]
+        case .diamond: return [(cx, y0), (x1, cy), (cx, y1), (x0, cy)]
+        default: return nil
+        }
+    }
+
+    /// Liegt der Punkt auf der Kontur (Breite `lineWidth`, mittig auf dem Rand)?
+    public func onOutline(_ px: Double, _ py: Double) -> Bool {
+        let h = lineWidth / 2
+        if let poly = polygon {
+            for i in poly.indices where Raster.distanceToSegment(px, py, poly[i], poly[(i + 1) % poly.count]) <= h { return true }
+            return false
+        }
+        return contains(px, py, inset: -h) && !contains(px, py, inset: h)
+    }
+
+    /// Innenfläche bei „gefüllt mit Kontur“ (bis zur Mitte der Kontur).
+    func fillContains(_ px: Double, _ py: Double) -> Bool {
+        polygon != nil ? contains(px, py, inset: 0) : contains(px, py, inset: lineWidth / 2)
+    }
+
     public var pixelBounds: PixelRect {
         let m = lineWidth / 2 + 2
         let ax = Int((x0 - m).rounded(.down)), ay = Int((y0 - m).rounded(.down))
@@ -329,13 +354,13 @@ extension Document {
                                 coverage: { x, y in Raster.supersample(x, y, n) { spec.contains($0, $1, inset: 0) } }, color: { _, _ in outline })
         case .outline:
             surf = Raster.paint(surf, rect: b, selection: sel, blend: blend, coverage: { x, y in
-                Raster.supersample(x, y, n) { spec.contains($0, $1, inset: -w / 2) && !spec.contains($0, $1, inset: w / 2) }
+                Raster.supersample(x, y, n) { spec.onOutline($0, $1) }
             }, color: { _, _ in outline })
         case .fillAndOutline:
             surf = Raster.paint(surf, rect: b, selection: sel, blend: blend,
-                                coverage: { x, y in Raster.supersample(x, y, n) { spec.contains($0, $1, inset: w / 2) } }, color: { _, _ in fill })
+                                coverage: { x, y in Raster.supersample(x, y, n) { spec.fillContains($0, $1) } }, color: { _, _ in fill })
             surf = Raster.paint(surf, rect: b, selection: sel, blend: blend, coverage: { x, y in
-                Raster.supersample(x, y, n) { spec.contains($0, $1, inset: -w / 2) && !spec.contains($0, $1, inset: w / 2) }
+                Raster.supersample(x, y, n) { spec.onOutline($0, $1) }
             }, color: { _, _ in outline })
         }
         s.layers[li].surface = surf

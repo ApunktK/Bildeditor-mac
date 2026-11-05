@@ -433,10 +433,10 @@ final class SelfTest {
             ctrl.tool = .lineCurve
             check("Optionen Linie", main.toolOptions.visibleGroups == ["pinsel", "mischung", "linie"], main.toolOptions.visibleGroups.joined(separator: ","))
             ctrl.brushWidth = 4; ctrl.lineDash = .solid; ctrl.arrowEnd = false
-            let h0 = g.history.count
+            let h0 = g.historyIndex
             drag(.lineCurve, CGPoint(x: 20, y: 150.5), CGPoint(x: 280, y: 152), shift: true)
             check("Linie mit ⇧ waagrecht eingerastet", g.layers[0].surface[150, 150] == ColorBgra(r: 200, g: 0, b: 0)
-                  && g.history.count == h0 + 1 && g.history.last?.name == "Linie/Kurve", "\(g.layers[0].surface[150, 150])")
+                  && g.historyIndex == h0 + 1 && g.history.last?.name == "Linie/Kurve", "\(g.layers[0].surface[150, 150])")
             ctrl.arrowEnd = true; ctrl.lineDash = .dashed
             drag(.lineCurve, CGPoint(x: 20, y: 180.5), CGPoint(x: 280, y: 180.5), right: true)
             check("Gestrichelte Linie mit Pfeil, rechte Taste = Sekundärfarbe", g.layers[0].surface[276, 180] == ColorBgra(r: 0, g: 0, b: 200))

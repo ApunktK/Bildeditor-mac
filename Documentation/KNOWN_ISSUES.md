@@ -59,6 +59,10 @@ Grundregel: Strg → Cmd, Alt → Option. Folgende Paint.NET-Kürzel kollidieren
 | A-14 | Während des Verschiebens schwebender Pixel | das Stück wird über allen Ebenen angezeigt; beim Fertigstellen wird es korrekt in die aktive Ebene gemischt | flüssiges Ziehen auch bei großen Bildern (sonst Neuberechnung des ganzen Bildes je Mausbewegung) |
 | A-15 | Rücktaste ⌫ | löscht die Auswahl nur, wenn die Zeichenfläche den Fokus hat; kein Menükürzel | sonst würde ⌫ in Textfeldern die Auswahl löschen |
 | A-16 | Zuschneiden | hebt die Auswahl danach auf | Referenz ungeklärt |
+| A-18 | Verlauf, Linie, Formen, Text | werden beim Loslassen bzw. Fertigstellen sofort eingemischt; Nachbearbeiten mit Anfassern (Referenz) fehlt noch | folgt (T-41, T-71, T-72, T-70) |
+| A-19 | Pinselbreite | Werkseinstellung 10 px; gemeinsam für Pinsel, Radiergummi, Kopierstempel, Umfärben, Linie und Formen | Referenzwert ungeklärt (R-1) |
+| A-20 | Umfärben | überträgt den Hellwert des Pixels relativ zur Sekundärfarbe auf die Primärfarbe | Verfahren der Referenz ungeklärt |
+| A-21 | Ellipsenkontur | Innenkante als verkleinerte Ellipse angenähert (bei sehr flachen Ellipsen leicht ungleichmäßige Breite) | einfache, schnelle Rasterung |
 | A-17 | Schmale Fenster (unter ca. 1150 pt) | beim Zauberstab wird der Auswahlmodus in der Werkzeugleiste ausgeblendet; Modi bleiben über ⌘/⌥ erreichbar | Fenster soll nicht breiter als der Bildschirm werden |
 | A-4 | Farbrad | immer in voller Helligkeit dargestellt; Klick bei (fast) Schwarz setzt Hellwert 100 | sonst bei Schwarz unbenutzbar; Referenzverhalten ungeklärt |
 | A-5 | Standardpalette | eigene 96 Farben (16 Grau + 16 Farbtöne × 5 Abstufungen) | Referenzpalette nicht übernommen (L-4) |

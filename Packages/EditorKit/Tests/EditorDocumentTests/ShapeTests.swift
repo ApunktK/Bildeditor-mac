@@ -38,6 +38,14 @@ final class ShapeTests: XCTestCase {
         XCTAssertFalse(rr.contains(1, 1, inset: 0)); XCTAssertTrue(rr.contains(10, 50, inset: 0)); XCTAssertTrue(rr.contains(50, 1, inset: 0))
     }
 
+    func testTriangleOutlineFollowsEdges() {
+        let tri = ShapeSpec(kind: .triangle, x0: 0, y0: 0, x1: 100, y1: 100, style: .outline, lineWidth: 4, antialias: false)
+        XCTAssertTrue(tri.onOutline(50, 100), "Grundlinie")
+        XCTAssertTrue(tri.onOutline(25, 50), "linke Kante")
+        XCTAssertTrue(tri.onOutline(50, 0.5), "Spitze")
+        XCTAssertFalse(tri.onOutline(50, 60), "innen")
+    }
+
     func testAntialiasedEdgesPartial() {
         let d = makeDoc()
         let s = d.stateWithShape(ShapeSpec(kind: .ellipse, x0: 10, y0: 10, x1: 110, y1: 110, style: .fill, lineWidth: 1, antialias: true),

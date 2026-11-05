@@ -1,8 +1,8 @@
 # IMPLEMENTATION_STATUS.md
 
-Stand: 04.11.2026 · Version 0.3.0 (Build 3) · **Phase 3 (Auswahl) weitgehend abgeschlossen** – Zwischenstand, keine Vollversion.
+Stand: 05.11.2026 · Version 0.5.0 (Build 5) · **Phase 4 (Werkzeuge) weitgehend abgeschlossen – alle 19 Werkzeuge bedienbar** – Zwischenstand, keine Vollversion.
 
-> Die App startet, verwaltet mehrere Bilder, öffnet und speichert, zeigt und zoomt; Ebenen-, Bild-, Verlaufs- und **Auswahlbefehle** arbeiten echt. **Malen, Korrekturen und Effekte gibt es noch nicht**; die zugehörigen Menüpunkte und Werkzeuge sind sichtbar, aber deaktiviert und mit Hinweis auf die geplante Phase versehen.
+> Die App startet, verwaltet mehrere Bilder, öffnet und speichert, zeigt und zoomt; Ebenen-, Bild-, Verlaufs- und **Auswahlbefehle** arbeiten echt. **Korrekturen und Effekte gibt es noch nicht**; die zugehörigen Menüpunkte und Werkzeuge sind sichtbar, aber deaktiviert und mit Hinweis auf die geplante Phase versehen.
 > „Getestet“ bedeutet in dieser Datei: automatisch geprüft im CI auf macOS 15.8 (Apple Silicon) – Kern-Tests, App-Tests und Selbsttest der fertig gebauten App (TEST_REPORT.md). Eine Bedienprobe von Hand am Mac des Nutzers steht noch aus.
 
 ## Phasen
@@ -12,7 +12,7 @@ Stand: 04.11.2026 · Version 0.3.0 (Build 3) · **Phase 3 (Auswahl) weitgehend a
 | 1 Referenzanalyse | Funktionsmatrix, Menüinventar, Architektur, Lizenzprüfung | **abgeschlossen** (offene Referenzmessungen R-1 bis R-10) | FUNCTION_MATRIX.md (243 Funktionen), MENU_INVENTORY.md, ARCHITECTURE.md, SOURCE_CODE_ANALYSIS.md, THIRD_PARTY_LICENSES.md |
 | 2 Grundanwendung | App, Hauptfenster, Menüs, Leisten, Register, Fenster, Zeichenfläche, Dateiverwaltung | **weitgehend abgeschlossen** – offen: Lineale, Einstellungsfenster, Lokalisierungsdateien | Bildeditor.app (Universal), DMG, Selbsttest 72/72 |
 | 3 Bildbearbeitungsengine | Auswahl, Zeichnen, Maus, Alpha, Ausschneiden/Einfügen | **Auswahl weitgehend abgeschlossen** – offen: Auswahl als JSON kopieren/einfügen, feste Größe/Verhältnis, Drehen/Skalieren beim Verschieben, Lineale; Zeichen-Engine folgt mit Phase 4 | Selbsttest 108/108 |
-| 4 Werkzeuge | 22 Werkzeuge (umgesetzt: Zoom, Hand, Rechteck-, Ellipsen-, Lassoauswahl, Zauberstab, Pixel/Auswahl verschieben) | teilweise | – |
+| 4 Werkzeuge | 19 Werkzeuge | **weitgehend abgeschlossen** – offen: Nachbearbeiten mit Anfassern (Verlauf, Linie, Formen, Text), 24 weitere Formen, Pinselhärte, Drehen/Skalieren beim Verschieben | Selbsttest 149 Prüfpunkte |
 | 5 Ebenen und Farben | Ebenen ✔ (vorgezogen), 14 Mischmodi ✔, Farbenfenster ✔ (Grundfunktion), Bildgröße/Leinwand, Drehen/Zoomen | teilweise vorgezogen | siehe Matrix L-xx, BM-01, C-xx |
 | 6 Korrekturen und Effekte | 13 Korrekturen, 40 Effekte | nicht begonnen | – |
 | 7 Formate und Projekte | Formate über ImageIO ✔ (PNG, JPEG, BMP, TIFF, GIF, HEIC, TGA); natives Projekt, PDN, Farbprofil, Scanner | teilweise vorgezogen | siehe Matrix FMT-xx |
@@ -55,8 +55,16 @@ Menübefehle laut Befehlstabelle der App: **67 von 134 umgesetzt**; die übrigen
 - **Bearbeiten:** Ausschneiden, Kopieren (mit Auswahl), Zusammengefügt kopieren, Einfügen (schwebend), In neue Ebene einfügen (schwebend), Auswahl löschen (⌫), Auswahl füllen (⌥⌫, Primärfarbe), Auswahl umkehren, Alles auswählen, Auswahl aufheben, Fertigstellen.
 - **Bild/Ansicht:** Auf Auswahl zuschneiden (nicht rechteckig → Ecken transparent), Auf Auswahl zoomen. Drehen/Spiegeln des Bildes nimmt die Auswahl mit.
 
+## Neu in Phase 4 (0.4.0 / 0.5.0)
+
+- **Malen:** Pinsel (Breite 1–2000, Kantenglättung, 14 Mischmodi + Überschreiben, ⇧-Klick = gerade Linie, rechte Taste = Sekundärfarbe), Stift (1 px), Radiergummi, Kopierstempel (⌘-Klick = Quelle), Umfärben (Toleranz, Schattierung bleibt). Alle Malwerkzeuge bleiben innerhalb der Auswahl; ein Strich = ein Verlaufsschritt.
+- **Füllen und Aufnehmen:** Farbeimer (zusammenhängend/global, Toleranz, Ebene/Bild), Farbpipette (1 × 1 bis 9 × 9, Ebene/Bild, danach Werkzeug beibehalten / zurück / Stift).
+- **Aufziehen:** Farbverlauf (Linear, gespiegelt, Raute, Radial, Konisch, Spirale ×2; Farb- und Transparenzmodus; Wiederholung), Linie (Breite, Strichart, Pfeile, ⇧ 15°), Formen (Rechteck, abgerundet, Ellipse, Dreieck, Raute; Kontur / gefüllt / gefüllt mit Kontur; ⇧ gleiche Seiten).
+- **Text:** Schrift, Größe, Fett/Kursiv/Unterstrichen, Ausrichtung, Kantenglättung, Live-Vorschau; Fertigstellen mit Esc, Klick daneben, Werkzeugwechsel oder einem Befehl.
+- **Anzeige:** Bild wird nur noch kachelweise neu zusammengesetzt (gemessen: Pinselstrich auf 12-MP-Bild 19–26 ms je Mausbewegung im CI).
+
 ## Nächste Schritte
 
 1. Bedienprobe von Hand auf dem Mac des Nutzers (DMG aus diesem Stand).
-2. Phase 4: Malwerkzeuge (Pinsel, Stift, Radierer, Farbeimer, Pipette, Verlauf, Linie, Formen, Text, Kopierstempel, Umfärben).
+2. Phase 5: Bildgröße ändern, Leinwandgröße, Drehen/Zoomen, Lineale; danach Phase 6 (Korrekturen und Effekte).
 3. Referenzmessung (R-1) für Standardwerte, sobald jemand Paint.NET 5.1.12 unter Windows bedienen kann.
