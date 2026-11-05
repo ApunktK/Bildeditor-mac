@@ -262,7 +262,7 @@ final class SelfTest {
         ctrl.tool = .pan
         check("Werkzeug Hand", ctrl.tool == .pan && main.toolOptions.toolPopup.titleOfSelectedItem == "Hand")
         check("Taste Z → Zoom", ctrl.handleSingleKey("z", shift: false) && ctrl.tool == .zoom)
-        _ = ctrl.handleSingleKey("b", shift: false)
+        _ = ctrl.handleSingleKey("t", shift: false)
         check("Nicht umgesetztes Werkzeug nicht wählbar", ctrl.tool == .zoom)
         let before = ctrl.colors
         _ = ctrl.handleSingleKey("x", shift: false)
@@ -376,7 +376,7 @@ final class SelfTest {
         check("Pipette: Primärfarbe aufgenommen", ctrl.colors.primary == blue)
         check("Pipette: zurück zum vorigen Werkzeug", ctrl.tool == .paintbrush)
         ctrl.tool = .colorPicker
-        stroke(.colorPicker, [CGPoint(x: 100.5, y: 30.5)], right: true)
+        stroke(.colorPicker, [CGPoint(x: 60.5, y: 30.5)], right: true)
         check("Pipette Rechtsklick: Sekundärfarbe", ctrl.colors.secondary == red, "\(ctrl.colors.secondary)")
         ctrl.pickerAfter = .stay
 
